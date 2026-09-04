@@ -3,7 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
 import api from "../api";
-import { Logo, Bell, Chat, ChevronDown, Home, Cap, Check, Sun, Moon } from "./icons";
+import { Bell, Chat, ChevronDown, Home, Cap, Check, Sun, Moon } from "./icons";
+import logoIcon from "../assets/medter-icon.png";
 
 interface Notif { id: number; text: string; isRead: boolean; createdAt: string; }
 
@@ -79,10 +80,10 @@ export default function Layout({ children }: { children: ReactNode }) {
       <header className="topbar">
         <div className="topbar-inner">
           <Link to="/" className="logo">
-            <span className="logo-mark"><Logo /></span>
+            <img src={logoIcon} alt="" className="logo-mark-img" />
             <span>
               <div className="logo-name">Med<span>Ter</span></div>
-              <div className="logo-tag">FOR DOCTORS. FOR GROWTH.</div>
+              <div className="logo-tag">CONNECT · DISCUSS · ADVANCE</div>
             </span>
           </Link>
 
@@ -158,7 +159,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <div className="footer-inner">
           <div>
             <div className="foot-logo">
-              <span className="logo-mark" style={{ width: 30, height: 30, borderRadius: 8 }}><Logo size={16} /></span>
+              <img src={logoIcon} alt="" className="logo-mark-img logo-mark-img-sm" />
               MedTer
             </div>
             <p>{t(

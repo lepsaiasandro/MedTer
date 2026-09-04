@@ -4,8 +4,9 @@ import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
 import PointsPanel from "../components/PointsPanel";
-import { Logo, Pin } from "../components/icons";
+import { Pin } from "../components/icons";
 import { StarsView } from "../components/Stars";
+import logoIcon from "../assets/medter-icon.png";
 
 interface TrainingCenter {
   userId: string;
@@ -44,8 +45,8 @@ export default function Dashboard() {
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* Hero */}
         <div className="hero" style={{ marginBottom: 28 }}>
-          <span className="hero-mark"><Logo size={150} /></span>
-          <h1>{t("გამარჯობა", "Hello")}, {user?.displayName} 👋</h1>
+          <img src={logoIcon} alt="" className="hero-mark hero-logo" aria-hidden="true" />
+          <h1>{t("გამარჯობა", "Hello")}, {user?.displayName}</h1>
           <p>{isDoctor
             ? t("იპოვე ტრენინგ ცენტრები, დაათვალიერე ტრენინგები და დაუკავშირდი მათ.", "Find training centers, browse trainings and get in touch.")
             : t("მართე შენი ცენტრი, გამოაქვეყნე ტრენინგები და დაუკავშირდი ექიმებს.", "Manage your center, publish trainings and connect with doctors.")}</p>

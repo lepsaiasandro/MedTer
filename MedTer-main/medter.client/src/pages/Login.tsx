@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import { Logo } from "../components/icons";
+import logoIcon from "../assets/medter-icon.png";
 
 export default function Login() {
   const { login } = useAuth();
@@ -33,7 +33,7 @@ export default function Login() {
     <div className="auth-wrap">
       <form onSubmit={submit} className="auth-card">
         <div className="auth-logo">
-          <span className="logo-mark"><Logo /></span>
+          <img src={logoIcon} alt="" className="logo-mark-img" />
           <span className="logo-name">Med<span>Ter</span></span>
         </div>
         <div className="auth-title">{t("შესვლა", "Sign in")}</div>

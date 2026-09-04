@@ -44,8 +44,12 @@ npm run dev
 ## სატესტო ანგარიშები (seed)
 პირველ გაშვებაზე ავტომატურად იქმნება. პაროლი ყველას: `pass123`
 
-**ექიმები:** `nino@medter.ge`, `giorgi@medter.ge`, `mariam@medter.ge`
-**ტრენინგ ცენტრები:** `promed@medter.ge`, `medlearn@medter.ge`, `vitamed@medter.ge`, `neuroedu@medter.ge`
+**ექიმები:** `nino@medter.ge`, `giorgi@medter.ge`, `mariam@medter.ge`  
+**ტრენინგ ცენტრები:** `promed@medter.ge`, `medlearn@medter.ge`, `vitamed@medter.ge`, `neuroedu@medter.ge`  
+**ადმინი:** `admin@medter.ge`
+
+> Meeting / user-test cheat sheet: see `USER_TESTING.md`.  
+> Hosted demo: http://medter.runasp.net
 
 > ქულების პანელი და სერტიფიკატები ამ ეტაპზე frontend-ის mock მონაცემებია (backend ჯერ არ არის).
 > ტრენინგ ცენტრების ფოტოები placeholder-ია (picsum.photos).
