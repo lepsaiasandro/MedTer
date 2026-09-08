@@ -22,6 +22,9 @@ public static class DbSeeder
             }, "pass123");
         }
 
+        // Demo certificates for sample doctors (runs even when users already exist).
+        await SeedDemoCertificatesAsync(services);
+
         // Only seed the demo data once — skip if centers/doctors already exist.
         if (users.Users.Any(u => u.Role != UserRole.Admin)) return;
 
@@ -122,6 +125,51 @@ public static class DbSeeder
                 CenterUserId = medlearn.Id, StartDate = new DateTime(2026, 9, 28)
             });
         }
+        await db.SaveChangesAsync();
+
+        // Fresh DB: users were just created, so seed certs now (earlier call was a no-op).
+        await SeedDemoCertificatesAsync(services);
+    }
+
+    /// <summary>
+    /// Idempotent demo certificates for sample doctors (also runs on already-seeded DBs).
+    /// </summary>
+    public static async Task SeedDemoCertificatesAsync(IServiceProvider services)
+    {
+        var db = services.GetRequiredService<AppDbContext>();
+        if (db.Certificates.Any()) return;
+
+        var users = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var nino = await users.FindByEmailAsync("nino@medter.ge");
+        var giorgi = await users.FindByEmailAsync("giorgi@medter.ge");
+        var mariam = await users.FindByEmailAsync("mariam@medter.ge");
+
+        var samples = new (ApplicationUser? User, string Title, int Points, string Center, DateTime Issued)[]
+        {
+            (nino, "Cardio Update 2026 — გულის უკმარისობის მართვა", 20, "ProMed აკადემია", new DateTime(2026, 3, 12, 10, 0, 0, DateTimeKind.Utc)),
+            (nino, "ECG ინტერპრეტაციის პრაქტიკული კურსი", 12, "ProMed აკადემია", new DateTime(2025, 11, 8, 14, 30, 0, DateTimeKind.Utc)),
+            (nino, "შინაგანი მედიცინის განახლება", 8, "VitaMed სასწავლო", new DateTime(2025, 9, 22, 9, 0, 0, DateTimeKind.Utc)),
+            (giorgi, "პედიატრიული რეანიმაციის ტრენინგი", 16, "MedLearn ცენტრი", new DateTime(2026, 2, 18, 11, 0, 0, DateTimeKind.Utc)),
+            (giorgi, "ვაქცინაციის თანამედროვე მიდგომები", 10, "VitaMed სასწავლო", new DateTime(2025, 12, 5, 16, 0, 0, DateTimeKind.Utc)),
+            (giorgi, "ნეონატოლოგიის ბაზისური მოდული", 14, "VitaMed სასწავლო", new DateTime(2025, 8, 14, 10, 0, 0, DateTimeKind.Utc)),
+            (mariam, "ინსულტის მართვის ალგორითმები", 18, "NeuroEdu ინსტიტუტი", new DateTime(2026, 1, 20, 13, 0, 0, DateTimeKind.Utc)),
+            (mariam, "ნევროლოგიური გადაუდებელი მდგომარეობები", 15, "NeuroEdu ინსტიტუტი", new DateTime(2025, 10, 3, 9, 30, 0, DateTimeKind.Utc)),
+            (mariam, "Emergency Medicine — რეანიმაციის პრაქტიკული ტრენინგი", 16, "MedLearn ცენტრი", new DateTime(2025, 7, 11, 12, 0, 0, DateTimeKind.Utc)),
+        };
+
+        foreach (var s in samples)
+        {
+            if (s.User is null) continue;
+            db.Certificates.Add(new Certificate
+            {
+                DoctorUserId = s.User.Id,
+                Title = s.Title,
+                Points = s.Points,
+                CenterName = s.Center,
+                IssuedAt = s.Issued,
+            });
+        }
+
         await db.SaveChangesAsync();
     }
 }

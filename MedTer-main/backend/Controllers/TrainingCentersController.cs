@@ -10,38 +10,63 @@ namespace backend.Controllers;
 
 [ApiController]
 [Route("api/training-centers")]
-[Authorize]
 public class TrainingCentersController : ControllerBase
 {
     private readonly AppDbContext _db;
 
     public TrainingCentersController(AppDbContext db) => _db = db;
 
-    private string MyId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private string? MyId => User.FindFirstValue(ClaimTypes.NameIdentifier);
     private bool IsDoctor => User.FindFirstValue(ClaimTypes.Role) == UserRole.Doctor.ToString();
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAll()
     {
-        var myId = MyId;
         var centers = await _db.TrainingCenterProfiles
+            .AsNoTracking()
             .OrderBy(c => c.Name)
-            .Select(c => new TrainingCenterDto(
-                c.UserId, c.Name, c.Description, c.City, c.Phone,
-                _db.Ratings.Where(r => r.CenterUserId == c.UserId).Average(r => (double?)r.Stars) ?? 0,
-                _db.Ratings.Count(r => r.CenterUserId == c.UserId),
-                _db.Ratings.Where(r => r.CenterUserId == c.UserId && r.DoctorUserId == myId)
-                    .Select(r => (int?)r.Stars).FirstOrDefault()))
+            .Select(c => new
+            {
+                c.UserId,
+                c.Name,
+                c.Description,
+                c.City,
+                c.Phone,
+                AverageRating = _db.Ratings.Where(r => r.CenterUserId == c.UserId).Average(r => (double?)r.Stars) ?? 0,
+                RatingCount = _db.Ratings.Count(r => r.CenterUserId == c.UserId),
+            })
             .ToListAsync();
 
-        return Ok(centers);
+        Dictionary<string, int>? myRatings = null;
+        var myId = MyId;
+        if (!string.IsNullOrEmpty(myId))
+        {
+            myRatings = await _db.Ratings
+                .AsNoTracking()
+                .Where(r => r.DoctorUserId == myId)
+                .ToDictionaryAsync(r => r.CenterUserId, r => r.Stars);
+        }
+
+        var result = centers.Select(c => new TrainingCenterDto(
+            c.UserId,
+            c.Name,
+            c.Description,
+            c.City,
+            c.Phone,
+            c.AverageRating,
+            c.RatingCount,
+            myRatings != null && myRatings.TryGetValue(c.UserId, out var stars) ? stars : null
+        ));
+
+        return Ok(result);
     }
 
-    // Doctor rates a center 1–5 (one rating per doctor, updatable)
+    [Authorize]
     [HttpPost("{id}/rating")]
     public async Task<IActionResult> Rate(string id, RateDto dto)
     {
-        if (!IsDoctor) return Forbid();
+        if (!IsDoctor || MyId is null) return Forbid();
         if (dto.Stars < 1 || dto.Stars > 5) return BadRequest("Stars must be 1–5");
 
         var existing = await _db.Ratings.FirstOrDefaultAsync(r => r.CenterUserId == id && r.DoctorUserId == MyId);

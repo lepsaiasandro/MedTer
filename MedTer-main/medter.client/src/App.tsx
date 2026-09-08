@@ -1,8 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth";
 import Layout from "./components/Layout";
-import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
 import Announcements from "./pages/Announcements";
@@ -12,10 +12,14 @@ import Certificates from "./pages/Certificates";
 import AdminDashboard from "./pages/AdminDashboard";
 import { type ReactNode } from "react";
 
+function Shell({ children }: { children: ReactNode }) {
+  return <Layout>{children}</Layout>;
+}
+
 function Protected({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
-  return <Layout>{children}</Layout>;
+  if (!user) return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 export default function App() {
@@ -24,16 +28,19 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
-      {/* Admins land on the approval dashboard */}
-      <Route path="/" element={<Protected>{isAdmin ? <AdminDashboard /> : <Dashboard />}</Protected>} />
-      <Route path="/chat" element={<Protected><Chat /></Protected>} />
-      <Route path="/announcements" element={<Protected><Announcements /></Protected>} />
-      <Route path="/my-announcements" element={<Protected><MyAnnouncements /></Protected>} />
-      <Route path="/certificates" element={<Protected><Certificates /></Protected>} />
-      <Route path="/admin" element={<Protected><AdminDashboard /></Protected>} />
-      <Route path="/centers/:userId" element={<Protected><CenterDetail /></Protected>} />
+
+      {/* Public: home + training centers list */}
+      <Route path="/" element={<Shell>{isAdmin ? <AdminDashboard /> : <Home />}</Shell>} />
+      <Route path="/centers" element={<Shell><Dashboard /></Shell>} />
+
+      {/* Auth required */}
+      <Route path="/centers/:userId" element={<Shell><Protected><CenterDetail /></Protected></Shell>} />
+      <Route path="/chat" element={<Shell><Protected><Chat /></Protected></Shell>} />
+      <Route path="/announcements" element={<Shell><Protected><Announcements /></Protected></Shell>} />
+      <Route path="/my-announcements" element={<Shell><Protected><MyAnnouncements /></Protected></Shell>} />
+      <Route path="/certificates" element={<Shell><Protected><Certificates /></Protected></Shell>} />
+      <Route path="/admin" element={<Shell><Protected><AdminDashboard /></Protected></Shell>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

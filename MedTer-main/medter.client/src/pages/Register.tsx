@@ -95,7 +95,7 @@ export default function Register() {
         </button>
 
         <p className="auth-foot">
-          {t("უკვე გაქვს ანგარიში?", "Already have an account?")} <Link to="/login">{t("შესვლა", "Sign in")}</Link>
+          {t("უკვე გაქვს ანგარიში?", "Already have an account?")} <Link to="/">{t("შესვლა", "Sign in")}</Link>
         </p>
       </form>
     </div>

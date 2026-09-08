@@ -1,8 +1,10 @@
 import axios from "axios";
 
-// In production the app is served from the same origin as the API (ASP.NET wwwroot),
-// so use relative URLs. In dev the API runs on a separate port.
-export const API_BASE = import.meta.env.PROD ? "" : "http://medter.runasp.net";
+// Production: same origin as the API (ASP.NET wwwroot).
+// Dev: local backend by default (override with VITE_API_BASE if needed).
+export const API_BASE = import.meta.env.PROD
+  ? ""
+  : (import.meta.env.VITE_API_BASE as string | undefined) || "http://localhost:5234";
 
 const api = axios.create({ baseURL: `${API_BASE}/api` });
 

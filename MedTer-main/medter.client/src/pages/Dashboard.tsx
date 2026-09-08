@@ -29,7 +29,11 @@ export default function Dashboard() {
   const [centers, setCenters] = useState<TrainingCenter[]>([]);
 
   useEffect(() => {
-    api.get<TrainingCenter[]>("/training-centers").then((r) => setCenters(r.data));
+    let cancelled = false;
+    api.get<TrainingCenter[]>("/training-centers")
+      .then((r) => { if (!cancelled) setCenters(r.data); })
+      .catch(() => { if (!cancelled) setCenters([]); });
+    return () => { cancelled = true; };
   }, []);
 
   const isDoctor = user?.role === "Doctor";
@@ -43,16 +47,14 @@ export default function Dashboard() {
   return (
     <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Hero */}
         <div className="hero" style={{ marginBottom: 28 }}>
           <img src={logoIcon} alt="" className="hero-mark hero-logo" aria-hidden="true" />
-          <h1>{t("გამარჯობა", "Hello")}, {user?.displayName}</h1>
+          <h1>{t("ტრენინგ ცენტრები", "Training Centers")}</h1>
           <p>{isDoctor
-            ? t("იპოვე ტრენინგ ცენტრები, დაათვალიერე ტრენინგები და დაუკავშირდი მათ.", "Find training centers, browse trainings and get in touch.")
-            : t("მართე შენი ცენტრი, გამოაქვეყნე ტრენინგები და დაუკავშირდი ექიმებს.", "Manage your center, publish trainings and connect with doctors.")}</p>
+            ? t("იპოვე ტრენინგ ცენტრები, დაათვალიერე პროფილები და დაუკავშირდი მათ.", "Find training centers, browse profiles and get in touch.")
+            : t("ნახე პლატფორმაზე რეგისტრირებული ტრენინგ ცენტრები.", "Browse training centers registered on the platform.")}</p>
         </div>
 
-        <h2 className="section-title">{t("ტრენინგ ცენტრები", "Training Centers")}</h2>
         {centers.length === 0 ? (
           <p style={{ color: "var(--muted)", fontSize: 14 }}>{t("ჯერ არ არის ტრენინგ ცენტრები.", "No training centers yet.")}</p>
         ) : (
@@ -73,7 +75,9 @@ export default function Dashboard() {
                   {c.city && <div className="meta"><div className="row"><Pin size={15} /> {c.city}</div></div>}
                   {c.description && <p className="desc" style={{ flex: 1 }}>{c.description}</p>}
                   <div style={{ marginTop: "auto", paddingTop: 4, display: "flex", flexDirection: "column", gap: 8 }}>
-                    <button className="btn btn-ghost btn-sm btn-block" onClick={() => navigate(`/centers/${c.userId}`)}>{t("დეტალურად", "Details")}</button>
+                    {user && (
+                      <button className="btn btn-ghost btn-sm btn-block" onClick={() => navigate(`/centers/${c.userId}`)}>{t("დეტალურად", "Details")}</button>
+                    )}
                     {isDoctor && <button className="btn btn-primary btn-sm btn-block" onClick={() => message(c)}>{t("მიწერა", "Message")}</button>}
                   </div>
                 </div>
