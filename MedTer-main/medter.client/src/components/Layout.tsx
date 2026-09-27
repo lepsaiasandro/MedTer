@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
 import api from "../api";
-import { Bell, Chat, ChevronDown, Home, Cap, Check, Sun, Moon, Users } from "./icons";
+import { Bell, Chat, ChevronDown, Home, Cap, Check, Sun, Moon, Users, Menu, X } from "./icons";
 import logoIcon from "../assets/medter-icon.png";
 
 interface Notif { id: number; text: string; isRead: boolean; createdAt: string; }
@@ -41,11 +41,17 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [blockedModal, setBlockedModal] = useState<{
+    status: "Rejected" | "Suspended" | "Pending";
+    reason?: string;
+    appealEmail: string;
+  } | null>(null);
 
   const refreshBadges = async () => {
     if (!user) return;
@@ -60,6 +66,17 @@ export default function Layout({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => { refreshBadges(); }, [location.pathname, user]);
+  useEffect(() => { setNavOpen(false); setMenuOpen(false); setNotifOpen(false); setLoginOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setNavOpen(false); };
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [navOpen]);
   useEffect(() => {
     if (!user) return;
     const timer = setInterval(refreshBadges, 20000);
@@ -83,17 +100,50 @@ export default function Layout({ children }: { children: ReactNode }) {
     setLoginLoading(true);
     try {
       const { data } = await api.post("/auth/login", { email, password });
-      login({ token: data.token, userId: data.userId, displayName: data.displayName, role: data.role });
+      login({
+        token: data.token,
+        userId: data.userId,
+        displayName: data.displayName,
+        role: data.role,
+        profilePhotoUrl: data.profilePhotoUrl ?? null,
+      });
       setLoginOpen(false);
       setEmail("");
       setPassword("");
       navigate("/");
-    } catch {
-      setLoginError(t("ელფოსტა ან პაროლი არასწორია", "Invalid email or password"));
+    } catch (err: any) {
+      const http = err?.response?.status;
+      const body = err?.response?.data;
+      const accountStatus = body?.status as string | undefined;
+      if (http === 403 && (accountStatus === "Rejected" || accountStatus === "Suspended")) {
+        setLoginOpen(false);
+        setBlockedModal({
+          status: accountStatus,
+          reason: body?.rejectionReason || undefined,
+          appealEmail: body?.appealEmail || "admin@medter.ge",
+        });
+      } else if (http === 403) {
+        setLoginError(t("ანგარიში ადმინის დამტკიცებას ელოდება", "Your account is pending administrator approval"));
+      } else {
+        setLoginError(body?.message || t("ელფოსტა ან პაროლი არასწორია", "Invalid email or password"));
+      }
     } finally {
       setLoginLoading(false);
     }
   };
+
+  const appealMailto = blockedModal
+    ? `mailto:${blockedModal.appealEmail}?subject=${encodeURIComponent(
+        blockedModal.status === "Rejected"
+          ? t("რეგისტრაციის უარის გასაჩივრება", "Appeal registration rejection")
+          : t("ანგარიშის შეჩერების გასაჩივრება", "Appeal account suspension")
+      )}&body=${encodeURIComponent(
+        t(
+          `გამარჯობა,\n\nმინდა გავასაჩივრო ჩემი ანგარიშის სტატუსი.\nელფოსტა: ${email}\n\nმადლობა.`,
+          `Hello,\n\nI would like to appeal my account status.\nEmail: ${email}\n\nThank you.`
+        )
+      )}`
+    : "#";
 
   const footerLinks = isGuest
     ? [
@@ -117,7 +167,17 @@ export default function Layout({ children }: { children: ReactNode }) {
     <div className="app">
       <header className="topbar">
         <div className="topbar-inner">
-          <Link to="/" className="logo">
+          <button
+            type="button"
+            className="menu-btn"
+            aria-label={navOpen ? t("მენიუს დახურვა", "Close menu") : t("მენიუ", "Menu")}
+            aria-expanded={navOpen}
+            onClick={() => { setNavOpen((o) => !o); setMenuOpen(false); setNotifOpen(false); setLoginOpen(false); }}
+          >
+            {navOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+
+          <Link to="/" className="logo" onClick={() => setNavOpen(false)}>
             <img src={logoIcon} alt="" className="logo-mark-img" />
             <span>
               <div className="logo-name">Med<span>Ter</span></div>
@@ -125,7 +185,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             </span>
           </Link>
 
-          <nav className="nav">
+          <nav className="nav" aria-label={t("ძირითადი ნავიგაცია", "Main navigation")}>
             {nav.map((item) => {
               const active = item.to === "/centers"
                 ? location.pathname === "/centers" || location.pathname.startsWith("/centers/")
@@ -176,7 +236,11 @@ export default function Layout({ children }: { children: ReactNode }) {
             {user ? (
               <div style={{ position: "relative" }}>
                 <button className="profile" onClick={() => { setMenuOpen((o) => !o); setNotifOpen(false); }}>
-                  <span className="avatar">{initial}</span>
+                  <span className="avatar">
+                    {user.profilePhotoUrl
+                      ? <img src={user.profilePhotoUrl} alt="" />
+                      : initial}
+                  </span>
                   <span className="profile-meta">
                     <span className="name">{user.displayName}</span>
                     <span className="role">{roleLabel}</span>
@@ -187,6 +251,14 @@ export default function Layout({ children }: { children: ReactNode }) {
                   <>
                     <div style={{ position: "fixed", inset: 0, zIndex: 65 }} onClick={() => setMenuOpen(false)} />
                     <div className="dropdown">
+                      <Link to="/profile" className="dd-item" onClick={() => setMenuOpen(false)}>
+                        {t("ჩემი პროფილი", "My Profile")}
+                      </Link>
+                      {isDoctor && (
+                        <Link to="/certificates" className="dd-item" onClick={() => setMenuOpen(false)}>
+                          {t("სერტიფიკატები", "Certificates")}
+                        </Link>
+                      )}
                       <button className="dd-item" onClick={doLogout}>{t("გასვლა", "Log out")}</button>
                     </div>
                   </>
@@ -247,7 +319,96 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
+      <button
+        type="button"
+        className={`mobile-nav-backdrop${navOpen ? " open" : ""}`}
+        aria-label={t("მენიუს დახურვა", "Close menu")}
+        onClick={() => setNavOpen(false)}
+      />
+      <nav className={`mobile-nav${navOpen ? " open" : ""}`} aria-label={t("მობილური ნავიგაცია", "Mobile navigation")}>
+        <div className="mobile-nav-head">
+          <Link to="/" className="logo" onClick={() => setNavOpen(false)}>
+            <img src={logoIcon} alt="" className="logo-mark-img logo-mark-img-sm" />
+            <span className="logo-name">Med<span>Ter</span></span>
+          </Link>
+          <button type="button" className="icon-btn" aria-label={t("დახურვა", "Close")} onClick={() => setNavOpen(false)}>
+            <X size={20} />
+          </button>
+        </div>
+        {nav.map((item) => {
+          const active = item.to === "/centers"
+            ? location.pathname === "/centers" || location.pathname.startsWith("/centers/")
+            : location.pathname === item.to;
+          return (
+            <Link key={item.to} to={item.to} className={active ? "active" : ""} onClick={() => setNavOpen(false)}>
+              {item.label}
+            </Link>
+          );
+        })}
+        {user && (
+          <>
+            <Link to="/chat" onClick={() => setNavOpen(false)}>{t("შეტყობინებები", "Messages")}</Link>
+            <Link to="/profile" onClick={() => setNavOpen(false)}>{t("ჩემი პროფილი", "My Profile")}</Link>
+          </>
+        )}
+        {!user && (
+          <Link to="/register" onClick={() => setNavOpen(false)}>{t("რეგისტრაცია", "Register")}</Link>
+        )}
+      </nav>
+
       <main className="page">{children}</main>
+
+      {blockedModal && (
+        <div className="modal" onClick={() => setBlockedModal(null)}>
+          <div className="box" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+            <div className="mhead">
+              <div>
+                <h3>
+                  {blockedModal.status === "Rejected"
+                    ? t("რეგისტრაცია უარყოფილია", "Registration rejected")
+                    : t("ანგარიში შეჩერებულია", "Account suspended")}
+                </h3>
+                <p>
+                  {blockedModal.status === "Rejected"
+                    ? t("ადმინისტრატორმა უარი თქვა თქვენს განაცხადზე", "An administrator declined your application")
+                    : t("თქვენი ანგარიში დროებით შეჩერებულია", "Your account has been temporarily suspended")}
+                </p>
+              </div>
+              <button className="xbtn" type="button" onClick={() => setBlockedModal(null)}>×</button>
+            </div>
+            <p style={{ fontSize: 14, color: "var(--text-body)", lineHeight: 1.55, marginBottom: 12 }}>
+              {blockedModal.status === "Rejected"
+                ? t(
+                    "თქვენი რეგისტრაცია უარყოფილია. თუ ფიქრობთ, რომ ეს შეცდომაა, შეგიძლიათ გაასაჩივროთ ელფოსტით.",
+                    "Your registration was rejected. If you believe this is a mistake, you can appeal by email."
+                  )
+                : t(
+                    "ანგარიში შეჩერებულია. შეგიძლიათ გაასაჩივროთ ელფოსტით ადმინისტრატორთან.",
+                    "The account is suspended. You can appeal by emailing the administrator."
+                  )}
+            </p>
+            {blockedModal.reason && (
+              <div style={{
+                background: "var(--surface-2)", borderRadius: 10, padding: "12px 14px",
+                fontSize: 13.5, color: "var(--muted)", marginBottom: 16, lineHeight: 1.45,
+              }}>
+                <b style={{ color: "var(--text)" }}>{t("მიზეზი", "Reason")}:</b> {blockedModal.reason}
+              </div>
+            )}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "flex-end" }}>
+              <button className="btn btn-text" type="button" onClick={() => setBlockedModal(null)}>
+                {t("დახურვა", "Close")}
+              </button>
+              <a className="btn btn-primary" href={appealMailto}>
+                {t("გასაჩივრება მეილით", "Appeal by email")}
+              </a>
+            </div>
+            <p style={{ marginTop: 12, fontSize: 12.5, color: "var(--soft)", textAlign: "right" }}>
+              {blockedModal.appealEmail}
+            </p>
+          </div>
+        </div>
+      )}
 
       <footer className="footer">
         <div className="footer-inner">

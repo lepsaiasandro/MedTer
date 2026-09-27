@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using backend.Data;
 
@@ -11,9 +12,11 @@ using backend.Data;
 namespace backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926235212_SyncModel")]
+    partial class SyncModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -232,33 +235,6 @@ namespace backend.Migrations
                     b.ToTable("Announcements");
                 });
 
-            modelBuilder.Entity("backend.Models.AppSettings", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("AnnouncementVerificationEnabled")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("UserVerificationEnabled")
-                        .HasColumnType("bit");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("AppSettings");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            AnnouncementVerificationEnabled = true,
-                            UserVerificationEnabled = true
-                        });
-                });
-
             modelBuilder.Entity("backend.Models.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
@@ -311,12 +287,6 @@ namespace backend.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
-                    b.Property<string>("ProfilePhotoUrl")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("RejectionReason")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int>("Role")
                         .HasColumnType("int");
 
@@ -329,9 +299,6 @@ namespace backend.Migrations
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
-
-                    b.Property<int>("VerificationStatus")
-                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -639,59 +606,6 @@ namespace backend.Migrations
                     b.ToTable("Notifications");
                 });
 
-            modelBuilder.Entity("backend.Models.ProfileChangeRequest", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("CenterName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("City")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FirstName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("LastName")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Phone")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("RejectionReason")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("ResolvedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Specialty")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime>("SubmittedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "Status");
-
-                    b.ToTable("ProfileChangeRequests");
-                });
-
             modelBuilder.Entity("backend.Models.Rating", b =>
                 {
                     b.Property<int>("Id")
@@ -731,11 +645,6 @@ namespace backend.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("AnnouncementVerificationEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
 
                     b.Property<string>("City")
                         .HasColumnType("nvarchar(max)");
@@ -946,17 +855,6 @@ namespace backend.Migrations
                     b.Navigation("Announcement");
 
                     b.Navigation("Doctor");
-                });
-
-            modelBuilder.Entity("backend.Models.ProfileChangeRequest", b =>
-                {
-                    b.HasOne("backend.Models.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("backend.Models.Rating", b =>

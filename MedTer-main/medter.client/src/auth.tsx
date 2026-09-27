@@ -5,12 +5,14 @@ export interface AuthUser {
   userId: string;
   displayName: string;
   role: "TrainingCenter" | "Doctor" | "Admin";
+  profilePhotoUrl?: string | null;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   login: (user: AuthUser) => void;
   logout: () => void;
+  updateUser: (patch: Partial<AuthUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextType>(null!);
@@ -35,8 +37,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const updateUser = (patch: Partial<AuthUser>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      localStorage.setItem("user", JSON.stringify(next));
+      return next;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

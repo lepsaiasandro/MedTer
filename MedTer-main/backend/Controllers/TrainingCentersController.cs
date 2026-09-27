@@ -25,6 +25,7 @@ public class TrainingCentersController : ControllerBase
     {
         var centers = await _db.TrainingCenterProfiles
             .AsNoTracking()
+            .Where(c => c.User!.IsApproved)
             .OrderBy(c => c.Name)
             .Select(c => new
             {

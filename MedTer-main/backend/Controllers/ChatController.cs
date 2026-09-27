@@ -18,84 +18,246 @@ public class ChatController : ControllerBase
     public ChatController(AppDbContext db) => _db = db;
 
     private string MyId => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private bool IsCenter => User.FindFirstValue(ClaimTypes.Role) == UserRole.TrainingCenter.ToString();
 
-    // Contacts (opposite role) enriched with last-message time + unread count,
-    // sorted so the most recently active conversation is first.
-    [HttpGet("contacts")]
-    public async Task<IActionResult> GetContacts()
+    // Groups the current user belongs to
+    [HttpGet("groups")]
+    public async Task<IActionResult> GetGroups()
     {
         var myId = MyId;
-        var myRole = Enum.Parse<UserRole>(User.FindFirstValue(ClaimTypes.Role)!);
-        var otherRole = myRole == UserRole.Doctor ? UserRole.TrainingCenter : UserRole.Doctor;
 
-        var users = await _db.Users
-            .Where(u => u.Role == otherRole && u.Id != myId)
-            .Select(u => new
+        var memberships = await _db.ChatGroupMembers
+            .AsNoTracking()
+            .Where(m => m.UserId == myId)
+            .Select(m => new { m.GroupId, m.LastReadAt })
+            .ToListAsync();
+
+        if (memberships.Count == 0) return Ok(Array.Empty<ChatGroupDto>());
+
+        var groupIds = memberships.Select(m => m.GroupId).ToList();
+        var lastRead = memberships.ToDictionary(m => m.GroupId, m => m.LastReadAt);
+
+        var groups = await _db.ChatGroups
+            .AsNoTracking()
+            .Where(g => groupIds.Contains(g.Id))
+            .Select(g => new
             {
-                u.Id,
-                u.DisplayName,
-                Role = u.Role.ToString(),
-                City = u.Role == UserRole.Doctor ? u.DoctorProfile!.City : u.TrainingCenterProfile!.City
+                g.Id,
+                g.AnnouncementId,
+                g.Name,
+                AnnouncementType = g.Announcement!.Type,
+                City = g.Announcement.City,
+                MemberCount = g.Members.Count,
+                g.CreatedByUserId,
+                LastMessage = g.Messages
+                    .OrderByDescending(x => x.SentAt)
+                    .Select(x => new { x.Text, x.SentAt })
+                    .FirstOrDefault()
             })
             .ToListAsync();
 
-        // Aggregate my conversation messages in memory (fine for MVP scale).
-        var msgs = await _db.Messages
-            .Where(m => m.SenderId == myId || m.ReceiverId == myId)
-            .Select(m => new { m.SenderId, m.ReceiverId, m.SentAt, m.IsRead })
+        var unreadCounts = await _db.GroupMessages
+            .AsNoTracking()
+            .Where(m => groupIds.Contains(m.GroupId) && m.SenderId != myId)
+            .Select(m => new { m.GroupId, m.SentAt })
             .ToListAsync();
 
-        var result = users
-            .Select(u =>
+        var result = groups
+            .Select(g =>
             {
-                var conv = msgs.Where(m => m.SenderId == u.Id || m.ReceiverId == u.Id).ToList();
-                DateTime? last = conv.Count > 0 ? conv.Max(m => m.SentAt) : null;
-                var unread = conv.Count(m => m.SenderId == u.Id && !m.IsRead);
-                return new ConversationDto(u.Id, u.DisplayName, u.Role, u.City, last, unread);
+                lastRead.TryGetValue(g.Id, out var lr);
+                var unread = unreadCounts.Count(u =>
+                    u.GroupId == g.Id && (lr is null || u.SentAt > lr));
+                return new ChatGroupDto(
+                    g.Id,
+                    g.AnnouncementId,
+                    g.Name,
+                    g.AnnouncementType,
+                    g.City,
+                    g.MemberCount,
+                    g.LastMessage?.SentAt,
+                    g.LastMessage?.Text,
+                    unread,
+                    g.CreatedByUserId == myId);
             })
-            .OrderByDescending(c => c.LastMessageAt ?? DateTime.MinValue)
-            .ThenBy(c => c.DisplayName)
+            .OrderByDescending(g => g.LastMessageAt ?? DateTime.MinValue)
+            .ThenBy(g => g.Name)
             .ToList();
 
         return Ok(result);
     }
 
-    // Mark messages from {otherUserId} as read (used when a live message arrives in an open chat).
-    [HttpPost("{otherUserId}/read")]
-    public async Task<IActionResult> MarkRead(string otherUserId)
+    // Published announcements owned by the center that don't have a group yet
+    [HttpGet("groups/creatable")]
+    public async Task<IActionResult> GetCreatable()
     {
-        await _db.Messages
-            .Where(m => m.SenderId == otherUserId && m.ReceiverId == MyId && !m.IsRead)
-            .ExecuteUpdateAsync(s => s.SetProperty(m => m.IsRead, true));
-        return Ok();
-    }
+        if (!IsCenter) return Forbid();
 
-    // Conversation history between the current user and {otherUserId}.
-    // Opening the conversation marks messages from the other user as read.
-    [HttpGet("{otherUserId}")]
-    public async Task<IActionResult> GetHistory(string otherUserId)
-    {
-        var myId = MyId;
-
-        var messages = await _db.Messages
-            .Where(m => (m.SenderId == myId && m.ReceiverId == otherUserId) ||
-                        (m.SenderId == otherUserId && m.ReceiverId == myId))
-            .OrderBy(m => m.SentAt)
-            .Select(m => new MessageDto(m.Id, m.SenderId, m.ReceiverId, m.Text, m.SentAt))
+        var list = await _db.Announcements
+            .AsNoTracking()
+            .Where(a => a.CenterUserId == MyId && a.Status == "Published")
+            .Where(a => !_db.ChatGroups.Any(g => g.AnnouncementId == a.Id))
+            .OrderByDescending(a => a.CreatedAt)
+            .Select(a => new CreatableAnnouncementDto(a.Id, a.Title, a.Type, a.Interests.Count))
             .ToListAsync();
 
-        await _db.Messages
-            .Where(m => m.SenderId == otherUserId && m.ReceiverId == myId && !m.IsRead)
-            .ExecuteUpdateAsync(s => s.SetProperty(m => m.IsRead, true));
+        return Ok(list);
+    }
+
+    // Training center creates a group for a training; all registered doctors are added
+    [HttpPost("groups")]
+    public async Task<IActionResult> CreateGroup(CreateGroupDto dto)
+    {
+        if (!IsCenter) return Forbid();
+
+        var announcement = await _db.Announcements
+            .Include(a => a.Interests)
+            .FirstOrDefaultAsync(a => a.Id == dto.AnnouncementId);
+
+        if (announcement is null) return NotFound();
+        if (announcement.CenterUserId != MyId) return Forbid();
+        if (announcement.Status != "Published")
+            return BadRequest(new { message = "ჯგუფის შექმნა შესაძლებელია მხოლოდ გამოქვეყნებული ტრენინგისთვის." });
+
+        var exists = await _db.ChatGroups.AnyAsync(g => g.AnnouncementId == announcement.Id);
+        if (exists)
+            return Conflict(new { message = "ამ ტრენინგისთვის ჯგუფი უკვე არსებობს." });
+
+        var group = new ChatGroup
+        {
+            AnnouncementId = announcement.Id,
+            Name = announcement.Title,
+            CreatedByUserId = MyId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Owner + every registered (interested) doctor
+        group.Members.Add(new ChatGroupMember { UserId = MyId, JoinedAt = DateTime.UtcNow });
+        foreach (var interest in announcement.Interests)
+        {
+            if (interest.DoctorUserId == MyId) continue;
+            group.Members.Add(new ChatGroupMember
+            {
+                UserId = interest.DoctorUserId,
+                JoinedAt = DateTime.UtcNow
+            });
+        }
+
+        _db.ChatGroups.Add(group);
+
+        foreach (var interest in announcement.Interests)
+        {
+            _db.Notifications.Add(new Notification
+            {
+                UserId = interest.DoctorUserId,
+                Text = $"შეიქმნა ტრენინგის ჯგუფი: „{announcement.Title}“ — თქვენ ავტომატურად დაემატეთ."
+            });
+        }
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new ChatGroupDto(
+            group.Id,
+            group.AnnouncementId,
+            group.Name,
+            announcement.Type,
+            announcement.City,
+            group.Members.Count,
+            null,
+            null,
+            0,
+            true));
+    }
+
+    [HttpGet("groups/{groupId:int}/messages")]
+    public async Task<IActionResult> GetGroupMessages(int groupId)
+    {
+        var member = await _db.ChatGroupMembers
+            .FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == MyId);
+        if (member is null) return Forbid();
+
+        var messages = await _db.GroupMessages
+            .AsNoTracking()
+            .Where(m => m.GroupId == groupId)
+            .OrderBy(m => m.SentAt)
+            .Select(m => new GroupMessageDto(
+                m.Id,
+                m.GroupId,
+                m.SenderId,
+                m.Sender!.DisplayName,
+                m.Text,
+                m.SentAt))
+            .ToListAsync();
+
+        member.LastReadAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
 
         return Ok(messages);
     }
 
-    // Total unread messages for the current user (for the header badge).
+    [HttpPost("groups/{groupId:int}/read")]
+    public async Task<IActionResult> MarkGroupRead(int groupId)
+    {
+        var member = await _db.ChatGroupMembers
+            .FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == MyId);
+        if (member is null) return Forbid();
+
+        member.LastReadAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpGet("groups/{groupId:int}/members")]
+    public async Task<IActionResult> GetMembers(int groupId)
+    {
+        var isMember = await _db.ChatGroupMembers
+            .AnyAsync(m => m.GroupId == groupId && m.UserId == MyId);
+        if (!isMember) return Forbid();
+
+        var members = await _db.ChatGroupMembers
+            .AsNoTracking()
+            .Where(m => m.GroupId == groupId)
+            .OrderBy(m => m.JoinedAt)
+            .Select(m => new GroupMemberDto(
+                m.UserId,
+                m.User!.DisplayName,
+                m.User.Role.ToString(),
+                m.User.Role == UserRole.Doctor
+                    ? m.User.DoctorProfile!.City
+                    : m.User.TrainingCenterProfile!.City))
+            .ToListAsync();
+
+        return Ok(members);
+    }
+
+    // Total unread group messages for the header badge
     [HttpGet("unread/count")]
     public async Task<IActionResult> UnreadCount()
     {
-        var count = await _db.Messages.CountAsync(m => m.ReceiverId == MyId && !m.IsRead);
+        var myId = MyId;
+        var memberships = await _db.ChatGroupMembers
+            .AsNoTracking()
+            .Where(m => m.UserId == myId)
+            .Select(m => new { m.GroupId, m.LastReadAt })
+            .ToListAsync();
+
+        if (memberships.Count == 0) return Ok(new { count = 0 });
+
+        var groupIds = memberships.Select(m => m.GroupId).ToList();
+        var lastRead = memberships.ToDictionary(m => m.GroupId, m => m.LastReadAt);
+
+        var messages = await _db.GroupMessages
+            .AsNoTracking()
+            .Where(m => groupIds.Contains(m.GroupId) && m.SenderId != myId)
+            .Select(m => new { m.GroupId, m.SentAt })
+            .ToListAsync();
+
+        var count = messages.Count(m =>
+        {
+            lastRead.TryGetValue(m.GroupId, out var lr);
+            return lr is null || m.SentAt > lr;
+        });
+
         return Ok(new { count });
     }
 }

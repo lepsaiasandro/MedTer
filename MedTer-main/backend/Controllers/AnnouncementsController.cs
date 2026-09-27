@@ -43,7 +43,8 @@ public class AnnouncementsController : ControllerBase
                 a.CenterUserId, a.Center!.DisplayName,
                 a.Interests.Count,
                 a.Interests.Any(i => i.DoctorUserId == myId),
-                _db.Favorites.Any(f => f.AnnouncementId == a.Id && f.DoctorUserId == myId)))
+                _db.Favorites.Any(f => f.AnnouncementId == a.Id && f.DoctorUserId == myId),
+                a.CreatedAt))
             .ToListAsync();
 
         return Ok(list);
@@ -64,7 +65,8 @@ public class AnnouncementsController : ControllerBase
                 a.City, a.Duration, a.Language, a.Points, a.Price, a.Seats, a.ImageUrl,
                 a.StartDate, a.RegistrationDeadline, a.Status, a.RejectionReason,
                 a.CenterUserId, a.Center!.DisplayName,
-                a.Interests.Count, false, false))
+                a.Interests.Count, false, false, a.CreatedAt,
+                _db.ChatGroups.Any(g => g.AnnouncementId == a.Id)))
             .ToListAsync();
 
         return Ok(list);
@@ -84,7 +86,7 @@ public class AnnouncementsController : ControllerBase
                 a.City, a.Duration, a.Language, a.Points, a.Price, a.Seats, a.ImageUrl,
                 a.StartDate, a.RegistrationDeadline, a.Status, a.RejectionReason,
                 a.CenterUserId, a.Center!.DisplayName,
-                a.Interests.Count, false, false))
+                a.Interests.Count, false, false, a.CreatedAt))
             .ToListAsync();
 
         return Ok(list);
@@ -134,7 +136,7 @@ public class AnnouncementsController : ControllerBase
         if (!IsCenter) return Forbid();
 
         var a = new Announcement { CenterUserId = MyId };
-        Apply(a, dto);
+        await ApplyAsync(a, dto);
         _db.Announcements.Add(a);
         await _db.SaveChangesAsync();
         return Ok(new { a.Id });
@@ -147,13 +149,13 @@ public class AnnouncementsController : ControllerBase
         if (a is null) return NotFound();
         if (a.CenterUserId != MyId) return Forbid();
 
-        Apply(a, dto);
+        await ApplyAsync(a, dto);
         await _db.SaveChangesAsync();
         return Ok();
     }
 
     // Copy incoming fields onto the entity (shared by Create + Update)
-    private static void Apply(Announcement a, CreateAnnouncementDto dto)
+    private async Task ApplyAsync(Announcement a, CreateAnnouncementDto dto)
     {
         a.Title = dto.Title;
         a.Type = dto.Type;
@@ -170,9 +172,17 @@ public class AnnouncementsController : ControllerBase
         a.ImageUrl = dto.ImageUrl;
         a.StartDate = dto.StartDate;
         a.RegistrationDeadline = dto.RegistrationDeadline;
-        // Draft stays a draft; anything the center "publishes" goes to admin for approval.
-        a.Status = dto.Status == "Draft" ? "Draft" : "Pending";
         a.RejectionReason = null;
+
+        if (dto.Status == "Draft")
+        {
+            a.Status = "Draft";
+            return;
+        }
+
+        // Draft stays a draft; publish goes to admin review unless verification is disabled.
+        var needsReview = await VerificationSettings.RequiresAnnouncementReviewAsync(_db, a.CenterUserId);
+        a.Status = needsReview ? "Pending" : "Published";
     }
 
     [HttpDelete("{id}")]
@@ -187,7 +197,7 @@ public class AnnouncementsController : ControllerBase
         return Ok();
     }
 
-    // Doctor marks interest (idempotent)
+    // Doctor marks interest (idempotent) — also auto-joins training group chat if it exists
     [HttpPost("{id}/interest")]
     public async Task<IActionResult> AddInterest(int id)
     {
@@ -205,8 +215,24 @@ public class AnnouncementsController : ControllerBase
                 UserId = a.CenterUserId,
                 Text = $"{MyName} დაინტერესდა თქვენი განცხადებით: „{a.Title}“"
             });
-            await _db.SaveChangesAsync();
         }
+
+        var group = await _db.ChatGroups.FirstOrDefaultAsync(g => g.AnnouncementId == id);
+        if (group is not null)
+        {
+            var member = await _db.ChatGroupMembers.AnyAsync(m => m.GroupId == group.Id && m.UserId == MyId);
+            if (!member)
+            {
+                _db.ChatGroupMembers.Add(new ChatGroupMember { GroupId = group.Id, UserId = MyId });
+                _db.Notifications.Add(new Notification
+                {
+                    UserId = MyId,
+                    Text = $"თქვენ დაემატეთ ტრენინგის ჯგუფს: „{group.Name}“"
+                });
+            }
+        }
+
+        await _db.SaveChangesAsync();
         return Ok();
     }
 
@@ -216,10 +242,18 @@ public class AnnouncementsController : ControllerBase
         var interest = await _db.Interests
             .FirstOrDefaultAsync(i => i.AnnouncementId == id && i.DoctorUserId == MyId);
         if (interest is not null)
-        {
             _db.Interests.Remove(interest);
-            await _db.SaveChangesAsync();
+
+        var group = await _db.ChatGroups.FirstOrDefaultAsync(g => g.AnnouncementId == id);
+        if (group is not null)
+        {
+            var member = await _db.ChatGroupMembers
+                .FirstOrDefaultAsync(m => m.GroupId == group.Id && m.UserId == MyId);
+            if (member is not null)
+                _db.ChatGroupMembers.Remove(member);
         }
+
+        await _db.SaveChangesAsync();
         return Ok();
     }
 

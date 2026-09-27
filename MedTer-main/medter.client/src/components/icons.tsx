@@ -33,6 +33,7 @@ export const Edit = (p: IconProps) => <Icon {...p}><path d="M12 20h9M16.5 3.5a2.
 export const Trash = (p: IconProps) => <Icon {...p}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon>;
 export const Check = (p: IconProps) => <Icon sw={2.5} {...p}><path d="M20 6 9 17l-5-5" /></Icon>;
 export const Search = (p: IconProps) => <Icon sw={2} {...p}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></Icon>;
+export const X = (p: IconProps) => <Icon sw={2.2} {...p}><path d="M18 6 6 18M6 6l12 12" /></Icon>;
 export const Users = (p: IconProps) => <Icon sw={2} {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></Icon>;
 export const Sliders = (p: IconProps) => <Icon sw={2} {...p}><path d="M3 6h18M7 12h10M11 18h2" /></Icon>;
 export const ArrowLeft = (p: IconProps) => <Icon sw={2} {...p}><path d="M19 12H5M12 19l-7-7 7-7" /></Icon>;
@@ -45,7 +46,9 @@ export const List = (p: IconProps) => <Icon sw={2} {...p}><rect x="3" y="4" widt
 export const Doc = (p: IconProps) => <Icon sw={2} {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></Icon>;
 export const Sun = (p: IconProps) => <Icon sw={2} {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></Icon>;
 export const Moon = (p: IconProps) => <Icon sw={2} {...p}><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></Icon>;
+export const Menu = (p: IconProps) => <Icon sw={2} {...p}><path d="M4 6h16M4 12h16M4 18h16" /></Icon>;
 export const Trophy = (p: IconProps) => <Icon sw={1.9} {...p}><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 4H4v2a3 3 0 0 0 3 3M17 4h3v2a3 3 0 0 1-3 3" /></Icon>;
+export const Clock = (p: IconProps) => <Icon sw={2} {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Icon>;
 export const Funnel = (p: IconProps) => <Icon sw={2} {...p}><path d="M3 4h18l-7 8v6l-4 2v-8z" /></Icon>;
 export const Bookmark = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
   <svg width={p.size ?? 17} height={p.size ?? 17} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>

@@ -11,16 +11,32 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<TrainingCenterProfile> TrainingCenterProfiles => Set<TrainingCenterProfile>();
     public DbSet<DoctorProfile> DoctorProfiles => Set<DoctorProfile>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<ChatGroup> ChatGroups => Set<ChatGroup>();
+    public DbSet<ChatGroupMember> ChatGroupMembers => Set<ChatGroupMember>();
+    public DbSet<GroupMessage> GroupMessages => Set<GroupMessage>();
     public DbSet<Announcement> Announcements => Set<Announcement>();
     public DbSet<Interest> Interests => Set<Interest>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Rating> Ratings => Set<Rating>();
     public DbSet<Certificate> Certificates => Set<Certificate>();
     public DbSet<Favorite> Favorites => Set<Favorite>();
+    public DbSet<ProfileChangeRequest> ProfileChangeRequests => Set<ProfileChangeRequest>();
+    public DbSet<AppSettings> AppSettings => Set<AppSettings>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        builder.Entity<AppSettings>().HasData(new AppSettings
+        {
+            Id = 1,
+            UserVerificationEnabled = true,
+            AnnouncementVerificationEnabled = true
+        });
+
+        builder.Entity<TrainingCenterProfile>()
+            .Property(p => p.AnnouncementVerificationEnabled)
+            .HasDefaultValue(true);
 
         builder.Entity<ApplicationUser>()
             .HasOne(u => u.TrainingCenterProfile)
@@ -32,7 +48,51 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             .WithOne(p => p.User)
             .HasForeignKey<DoctorProfile>(p => p.UserId);
 
+        builder.Entity<ProfileChangeRequest>()
+            .HasOne(r => r.User)
+            .WithMany()
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<ProfileChangeRequest>()
+            .HasIndex(r => new { r.UserId, r.Status });
+
         builder.Entity<Message>().HasIndex(m => new { m.SenderId, m.ReceiverId });
+
+        builder.Entity<ChatGroup>()
+            .HasOne(g => g.Announcement)
+            .WithMany()
+            .HasForeignKey(g => g.AnnouncementId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<ChatGroup>()
+            .HasOne(g => g.CreatedBy)
+            .WithMany()
+            .HasForeignKey(g => g.CreatedByUserId)
+            .OnDelete(DeleteBehavior.NoAction);
+        builder.Entity<ChatGroup>().HasIndex(g => g.AnnouncementId).IsUnique();
+
+        builder.Entity<ChatGroupMember>()
+            .HasOne(m => m.Group)
+            .WithMany(g => g.Members)
+            .HasForeignKey(m => m.GroupId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<ChatGroupMember>()
+            .HasOne(m => m.User)
+            .WithMany()
+            .HasForeignKey(m => m.UserId)
+            .OnDelete(DeleteBehavior.NoAction);
+        builder.Entity<ChatGroupMember>().HasIndex(m => new { m.GroupId, m.UserId }).IsUnique();
+
+        builder.Entity<GroupMessage>()
+            .HasOne(m => m.Group)
+            .WithMany(g => g.Messages)
+            .HasForeignKey(m => m.GroupId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<GroupMessage>()
+            .HasOne(m => m.Sender)
+            .WithMany()
+            .HasForeignKey(m => m.SenderId)
+            .OnDelete(DeleteBehavior.NoAction);
+        builder.Entity<GroupMessage>().HasIndex(m => new { m.GroupId, m.SentAt });
 
         builder.Entity<Announcement>()
             .HasOne(a => a.Center)

@@ -1,5 +1,6 @@
 using backend.Models;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace backend.Data;
 
@@ -9,21 +10,48 @@ public static class DbSeeder
     {
         var users = services.GetRequiredService<UserManager<ApplicationUser>>();
 
-        // Ensure the platform admin exists (idempotent — also fixes already-seeded DBs).
-        if (await users.FindByEmailAsync("admin@medter.ge") is null)
+        // Ensure the platform admin exists (idempotent — also resets password/role on already-seeded DBs).
+        const string adminEmail = "admin@medter.ge";
+        const string adminPassword = "pass123";
+        var admin = await users.FindByEmailAsync(adminEmail);
+        if (admin is null)
         {
-            await users.CreateAsync(new ApplicationUser
+            var adminUser = new ApplicationUser
             {
-                UserName = "admin@medter.ge",
-                Email = "admin@medter.ge",
+                UserName = adminEmail,
+                Email = adminEmail,
                 EmailConfirmed = true,
                 Role = UserRole.Admin,
-                DisplayName = "ადმინისტრატორი"
-            }, "pass123");
+                DisplayName = "ადმინისტრატორი",
+                CreatedAt = DateTime.UtcNow
+            };
+            adminUser.SetVerification(VerificationStatus.Approved);
+            var create = await users.CreateAsync(adminUser, adminPassword);
+            if (!create.Succeeded)
+                throw new InvalidOperationException(
+                    "Failed to seed admin: " + string.Join("; ", create.Errors.Select(e => e.Description)));
+        }
+        else
+        {
+            admin.Role = UserRole.Admin;
+            admin.SetVerification(VerificationStatus.Approved);
+            admin.EmailConfirmed = true;
+            admin.DisplayName = string.IsNullOrWhiteSpace(admin.DisplayName) ? "ადმინისტრატორი" : admin.DisplayName;
+            await users.UpdateAsync(admin);
+
+            // Always restore the known demo password so login never drifts.
+            var token = await users.GeneratePasswordResetTokenAsync(admin);
+            var reset = await users.ResetPasswordAsync(admin, token, adminPassword);
+            if (!reset.Succeeded)
+                throw new InvalidOperationException(
+                    "Failed to reset admin password: " + string.Join("; ", reset.Errors.Select(e => e.Description)));
         }
 
         // Demo certificates for sample doctors (runs even when users already exist).
         await SeedDemoCertificatesAsync(services);
+
+        // Demo training group chat (idempotent).
+        await SeedDemoGroupChatAsync(services);
 
         // Only seed the demo data once — skip if centers/doctors already exist.
         if (users.Users.Any(u => u.Role != UserRole.Admin)) return;
@@ -45,6 +73,7 @@ public static class DbSeeder
                 EmailConfirmed = true,
                 Role = UserRole.TrainingCenter,
                 DisplayName = c.Name,
+                CreatedAt = DateTime.UtcNow,
                 TrainingCenterProfile = new TrainingCenterProfile
                 {
                     Name = c.Name,
@@ -53,6 +82,7 @@ public static class DbSeeder
                     Phone = "555000000"
                 }
             };
+            user.SetVerification(VerificationStatus.Approved);
             await users.CreateAsync(user, "pass123");
         }
 
@@ -72,6 +102,7 @@ public static class DbSeeder
                 EmailConfirmed = true,
                 Role = UserRole.Doctor,
                 DisplayName = $"{d.First} {d.Last}",
+                CreatedAt = DateTime.UtcNow,
                 DoctorProfile = new DoctorProfile
                 {
                     FirstName = d.First,
@@ -81,6 +112,7 @@ public static class DbSeeder
                     Phone = "555111111"
                 }
             };
+            user.SetVerification(VerificationStatus.Approved);
             await users.CreateAsync(user, "pass123");
         }
 
@@ -170,6 +202,57 @@ public static class DbSeeder
             });
         }
 
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Idempotent demo group chat for Cardio Update training + registered doctors.
+    /// </summary>
+    public static async Task SeedDemoGroupChatAsync(IServiceProvider services)
+    {
+        var db = services.GetRequiredService<AppDbContext>();
+        if (db.ChatGroups.Any()) return;
+
+        var users = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var center = await users.FindByEmailAsync("promed@medter.ge");
+        var nino = await users.FindByEmailAsync("nino@medter.ge");
+        var giorgi = await users.FindByEmailAsync("giorgi@medter.ge");
+        var mariam = await users.FindByEmailAsync("mariam@medter.ge");
+        if (center is null) return;
+
+        var announcement = await db.Announcements
+            .FirstOrDefaultAsync(a => a.CenterUserId == center.Id && a.Status == "Published");
+        if (announcement is null) return;
+
+        foreach (var doctor in new[] { nino, giorgi, mariam })
+        {
+            if (doctor is null) continue;
+            var interested = await db.Interests
+                .AnyAsync(i => i.AnnouncementId == announcement.Id && i.DoctorUserId == doctor.Id);
+            if (!interested)
+                db.Interests.Add(new Interest { AnnouncementId = announcement.Id, DoctorUserId = doctor.Id });
+        }
+        await db.SaveChangesAsync();
+
+        var group = new ChatGroup
+        {
+            AnnouncementId = announcement.Id,
+            Name = announcement.Title,
+            CreatedByUserId = center.Id,
+            CreatedAt = DateTime.UtcNow
+        };
+        group.Members.Add(new ChatGroupMember { UserId = center.Id });
+        foreach (var interest in await db.Interests.Where(i => i.AnnouncementId == announcement.Id).ToListAsync())
+            group.Members.Add(new ChatGroupMember { UserId = interest.DoctorUserId });
+
+        group.Messages.Add(new GroupMessage
+        {
+            SenderId = center.Id,
+            Text = "გამარჯობა! ეს არის ტრენინგის ჯგუფური ჩატი. კითხვები აქ დაწერეთ.",
+            SentAt = DateTime.UtcNow
+        });
+
+        db.ChatGroups.Add(group);
         await db.SaveChangesAsync();
     }
 }

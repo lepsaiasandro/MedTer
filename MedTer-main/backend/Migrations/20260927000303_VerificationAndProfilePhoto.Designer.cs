@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using backend.Data;
 
@@ -11,9 +12,11 @@ using backend.Data;
 namespace backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260927000303_VerificationAndProfilePhoto")]
+    partial class VerificationAndProfilePhoto
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -230,33 +233,6 @@ namespace backend.Migrations
                     b.HasIndex("CenterUserId");
 
                     b.ToTable("Announcements");
-                });
-
-            modelBuilder.Entity("backend.Models.AppSettings", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("AnnouncementVerificationEnabled")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("UserVerificationEnabled")
-                        .HasColumnType("bit");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("AppSettings");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            AnnouncementVerificationEnabled = true,
-                            UserVerificationEnabled = true
-                        });
                 });
 
             modelBuilder.Entity("backend.Models.ApplicationUser", b =>
@@ -731,11 +707,6 @@ namespace backend.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("AnnouncementVerificationEnabled")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
 
                     b.Property<string>("City")
                         .HasColumnType("nvarchar(max)");

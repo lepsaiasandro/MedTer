@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
-import { ArrowLeft, Pin, Calendar, Mail, Check, Bookmark } from "../components/icons";
+import { ArrowLeft, Pin, Calendar, Mail, Check, Bookmark, Cap } from "../components/icons";
 import { StarsView, StarsInput } from "../components/Stars";
 import ShareMenu from "../components/ShareMenu";
+import MediaPlaceholder from "../components/MediaPlaceholder";
+import EmptyState from "../components/EmptyState";
 import { usePrefs } from "../i18n";
 
 interface TrainingCenter {
@@ -57,33 +59,38 @@ export default function CenterDetail() {
     load();
   };
 
-  const message = () => {
-    if (!center) return;
-    navigate("/chat", { state: { contact: { id: center.userId, displayName: center.name, role: "TrainingCenter", city: center.city } } });
-  };
-
-  if (!center) return <div style={{ color: "var(--soft)", fontSize: 14 }}>{t("იტვირთება...", "Loading...")}</div>;
+  if (!center) {
+    return (
+      <div className="skeleton-card" style={{ padding: 24, maxWidth: 640 }}>
+        <div className="skeleton skeleton-line" style={{ width: "40%", height: 28, marginBottom: 16 }} />
+        <div className="skeleton skeleton-line" style={{ width: "70%" }} />
+        <div className="skeleton skeleton-line" style={{ width: "55%", marginTop: 8 }} />
+      </div>
+    );
+  }
 
   return (
     <div>
       <a className="back-link" onClick={() => navigate(-1)}><ArrowLeft size={16} /> {t("უკან", "Back")}</a>
 
       {/* Center header */}
-      <div className="card" style={{ padding: 24, marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div className="card reveal" style={{ padding: "clamp(16px, 3vw, 24px)", marginBottom: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <span style={{ width: 64, height: 64, borderRadius: 18, flex: "none", background: "var(--brand-soft)", color: "var(--brand)", display: "grid", placeItems: "center", fontSize: 26, fontWeight: 800 }}>
             {center.name.charAt(0)}
           </span>
-          <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)" }}>{center.name}</h1>
+          <div style={{ flex: "1 1 180px", minWidth: 0 }}>
+            <div className="trust-row" style={{ marginBottom: 6 }}>
+              <span className="trust-chip trust-chip--ok"><Check size={12} /> {t("ვერიფიცირებული", "Verified")}</span>
+              {center.city && <span className="trust-chip"><Pin size={12} /> {center.city}</span>}
+            </div>
+            <h1 style={{ fontSize: "clamp(1.15rem, 1rem + 1vw, 1.4rem)", fontWeight: 800, color: "var(--text)", lineHeight: 1.3 }}>{center.name}</h1>
             <div className="meta" style={{ marginTop: 6 }}>
-              <div className="row">
-                {center.city && <><Pin size={15} /> {center.city}</>}
-                {center.phone && <span style={{ marginLeft: 8 }}>· 📞 {center.phone}</span>}
+              <div className="row" style={{ flexWrap: "wrap" }}>
+                {center.phone && <span>{center.phone}</span>}
               </div>
             </div>
           </div>
-          {isDoctor && <button className="btn btn-primary" onClick={message}>{t("მიწერა", "Message")}</button>}
         </div>
         {center.description && <p style={{ color: "var(--text-body)", marginTop: 16, fontSize: 14 }}>{center.description}</p>}
 
@@ -93,7 +100,7 @@ export default function CenterDetail() {
             <StarsView value={center.averageRating} count={center.ratingCount} size={18} />
           </div>
           {isDoctor && (
-            <div style={{ marginLeft: "auto" }}>
+            <div style={{ marginLeft: "auto", flex: "1 1 160px" }}>
               <div style={{ fontSize: 12, color: "var(--soft)", fontWeight: 600, marginBottom: 4 }}>{center.myRating ? t("შენი შეფასება", "Your rating") : t("შეაფასე ეს ცენტრი", "Rate this center")}</div>
               <StarsInput value={center.myRating ?? 0} onRate={rate} />
             </div>
@@ -103,15 +110,19 @@ export default function CenterDetail() {
 
       <h2 className="section-title">{t("ამ ცენტრის ტრენინგები", "This center's trainings")}</h2>
       {items.length === 0 ? (
-        <p style={{ color: "var(--muted)", fontSize: 14 }}>{t("ჯერ არ აქვს გამოქვეყნებული ტრენინგები.", "No published trainings yet.")}</p>
+        <EmptyState
+          icon={<Cap size={42} sw={1.6} />}
+          title={t("ჯერ არ აქვს ტრენინგები", "No trainings yet")}
+          text={t("ამ ცენტრს ჯერ არ აქვს გამოქვეყნებული ტრენინგები.", "This center has no published trainings yet.")}
+        />
       ) : (
         <div className="grid">
-          {items.map((a) => (
-            <article key={a.id} className="card card-interactive">
+          {items.map((a, i) => (
+            <article key={a.id} className="card card-interactive reveal" style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}>
               <div className="media pv-media">
                 {a.imageUrl
                   ? <img src={a.imageUrl} alt="" />
-                  : <img src={`https://loremflickr.com/480/270/medical,training?lock=${a.id + 10}`} onError={(e) => { e.currentTarget.src = `https://picsum.photos/seed/a${a.id}/480/270`; }} alt="" />}
+                  : <MediaPlaceholder title={a.title} variant="teal" />}
                 <span className="badge-points"><span className="tealdot" /> {a.points} {t("ქულა", "pts")}</span>
                 {isDoctor && (
                   <button className="act" title={t("რჩეულებში დამატება", "Add to favorites")}

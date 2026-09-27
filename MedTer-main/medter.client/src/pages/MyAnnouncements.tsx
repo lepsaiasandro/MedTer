@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../api";
 import ShareMenu from "../components/ShareMenu";
 import { usePrefs } from "../i18n";
@@ -24,6 +25,7 @@ interface Announcement {
   status: string;
   rejectionReason?: string;
   interestedCount: number;
+  hasGroupChat?: boolean;
 }
 
 interface InterestedDoctor {
@@ -123,6 +125,9 @@ const IcEdit = (
 const IcTrash = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></svg>
 );
+const IcChat = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+);
 const IcCheck = (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>
 );
@@ -149,8 +154,50 @@ export default function MyAnnouncements() {
   const [certBusy, setCertBusy] = useState<string | null>(null);  // doctorUserId being uploaded
   const [certDone, setCertDone] = useState<string | null>(null);  // recently succeeded (green flash)
 
+  const [verificationOn, setVerificationOn] = useState(true);
+  const [globalVerificationOn, setGlobalVerificationOn] = useState(true);
+  const [verBusy, setVerBusy] = useState(false);
+
   const load = () => api.get<Announcement[]>("/announcements/mine").then((r) => setItems(r.data));
-  useEffect(() => { load(); }, []);
+  const loadVerification = () =>
+    api.get<{ announcementVerificationEnabled: boolean; globalAnnouncementVerificationEnabled: boolean }>(
+      "/users/me/verification-settings"
+    ).then((r) => {
+      setVerificationOn(r.data.announcementVerificationEnabled);
+      setGlobalVerificationOn(r.data.globalAnnouncementVerificationEnabled);
+    }).catch(() => {});
+
+  useEffect(() => { load(); loadVerification(); }, []);
+
+  const toggleVerification = async (enabled: boolean) => {
+    if (!enabled && !confirm(t(
+      "ვერიფიკაციის გამორთვისას თქვენი ტრენინგები ადმინის გარეშე გამოქვეყნდება. გაგრძელება?",
+      "Disabling verification publishes your trainings without admin review. Continue?"
+    ))) return;
+    setVerBusy(true);
+    try {
+      const { data } = await api.put<{ announcementVerificationEnabled: boolean; globalAnnouncementVerificationEnabled: boolean }>(
+        "/users/me/verification-settings",
+        { announcementVerificationEnabled: enabled }
+      );
+      setVerificationOn(data.announcementVerificationEnabled);
+      setGlobalVerificationOn(data.globalAnnouncementVerificationEnabled);
+      await load();
+    } finally {
+      setVerBusy(false);
+    }
+  };
+
+  const createGroupChat = async (announcementId: number) => {
+    try {
+      await api.post("/chat/groups", { announcementId });
+      await load();
+      alert(t("ჯგუფი შეიქმნა — რეგისტრირებული ექიმები დაემატნენ", "Group created — registered doctors were added"));
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      alert(msg || t("ჯგუფის შექმნა ვერ მოხერხდა", "Could not create group"));
+    }
+  };
 
   /* ── derived ── */
   const stats = useMemo(() => ({
@@ -527,6 +574,36 @@ export default function MyAnnouncements() {
         <button className="btn btn-primary btn-lg" onClick={openCreate}>{IcPlus} {t("ახალი განცხადება", "New announcement")}</button>
       </div>
 
+      <div className="card" style={{ padding: "16px 18px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 14.5, color: "var(--text)" }}>
+            {t("ტრენინგების ვერიფიკაცია", "Training verification")}
+          </div>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--muted)", lineHeight: 1.45 }}>
+            {!globalVerificationOn
+              ? t("ადმინმა გლობალურად გამორთო ტრენინგების ვერიფიკაცია — ყველა ტრენინგი მაშინვე ქვეყნდება.", "Admin disabled training verification globally — all trainings publish immediately.")
+              : verificationOn
+                ? t("ჩართულია: გამოქვეყნება ადმინის დამტკიცებას ელოდება (შეუძლია უარყოფაც).", "On: publishing waits for admin approval (admin can also reject).")
+                : t("გამორთულია: თქვენი ტრენინგები ადმინის გარეშე გამოქვეყნდება.", "Off: your trainings publish without admin review.")}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+          <span className={`status ${verificationOn && globalVerificationOn ? "pending" : "pub"}`} style={{ position: "static" }}>
+            {verificationOn && globalVerificationOn ? t("ჩართულია", "On") : t("გამორთულია", "Off")}
+          </span>
+          <button
+            className="btn btn-ghost btn-sm"
+            disabled={verBusy || !globalVerificationOn}
+            onClick={() => void toggleVerification(!verificationOn)}
+            title={!globalVerificationOn ? t("გლობალურად გამორთულია ადმინის მიერ", "Globally disabled by admin") : undefined}
+          >
+            {verificationOn
+              ? t("გამორთვა", "Disable")
+              : t("ჩართვა", "Enable")}
+          </button>
+        </div>
+      </div>
+
       {/* stat strip */}
       <div className="stats">
         <div className="stat">
@@ -564,7 +641,13 @@ export default function MyAnnouncements() {
 
       {/* cards */}
       {visible.length === 0 ? (
-        <p style={{ color: "var(--muted)", fontSize: 14 }}>{t("ამ ფილტრით განცხადება ვერ მოიძებნა.", "No announcements match this filter.")}</p>
+        <div className="empty">
+          <div className="ill">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /><path d="M12 12v4M10 14h4" strokeWidth="2" /></svg>
+          </div>
+          <h2>{t("განცხადება ვერ მოიძებნა", "No announcements found")}</h2>
+          <p>{t("ამ ფილტრით განცხადება ვერ მოიძებნა.", "No announcements match this filter.")}</p>
+        </div>
       ) : (
         <div className="grid">
           {visible.map((a) => {
@@ -613,6 +696,18 @@ export default function MyAnnouncements() {
                     )}
                     <div className="card-actions">
                       {published && <ShareMenu title={a.title} />}
+                      {published && !a.hasGroupChat && (
+                        <button
+                          className="act"
+                          title={t("ჯგუფური ჩატის შექმნა", "Create group chat")}
+                          onClick={() => createGroupChat(a.id)}
+                        >
+                          {IcChat}
+                        </button>
+                      )}
+                      {published && a.hasGroupChat && (
+                        <Link className="act" to="/chat" title={t("ჯგუფური ჩატი", "Group chat")}>{IcChat}</Link>
+                      )}
                       {published && (
                         <button className="act" title={t("დაინტერესებულები", "Interested doctors")} onClick={() => openInterested(a.id)}>{IcEye}</button>
                       )}
