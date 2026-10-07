@@ -74,11 +74,14 @@ jobs:
       # Optional: set GitHub secrets MEDTER_SQL_CONNECTION_STRING, MEDTER_JWT_KEY, MEDTER_SEED_ADMIN_PASSWORD
       # Use SQL User ID/Password — not "Active Directory Default"
       - name: Configure App Service connection + settings
-        if: ${{ secrets.MEDTER_SQL_CONNECTION_STRING != '' }}
         uses: azure/cli@v2
         with:
           inlineScript: |
             set -euo pipefail
+            if [ -z "${SQL_CONNECTION_STRING:-}" ]; then
+              echo "Skipping Azure config (secret MEDTER_SQL_CONNECTION_STRING not set)."
+              exit 0
+            fi
             RG=$(az webapp list --query "[?name=='medter'].resourceGroup" -o tsv | head -n1)
             echo "Resource group: $RG"
             az webapp config connection-string set \
@@ -94,7 +97,8 @@ jobs:
                 Jwt__Key="${JWT_KEY}" \
                 Jwt__Issuer=medter \
                 Jwt__Audience=medter \
-                Seed__AdminPassword="${SEED_ADMIN_PASSWORD}"
+                Seed__AdminPassword="${SEED_ADMIN_PASSWORD}" \
+                Seed__Demo=true
             az webapp restart --resource-group "$RG" --name medter
         env:
           SQL_CONNECTION_STRING: ${{ secrets.MEDTER_SQL_CONNECTION_STRING }}
