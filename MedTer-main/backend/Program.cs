@@ -40,8 +40,12 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Database — connection string from appsettings or Azure App Settings (ConnectionStrings__Default)
+var sqlConnection = builder.Configuration.GetConnectionString("Default");
+if (string.IsNullOrWhiteSpace(sqlConnection))
+    throw new InvalidOperationException(
+        "ConnectionStrings:Default is not configured. Set ConnectionStrings__Default (or Connection string 'Default') in Azure App Settings.");
 builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+    opt.UseSqlServer(sqlConnection));
 
 // Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt =>
@@ -124,7 +128,10 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
-    await backend.Data.DbSeeder.SeedAsync(scope.ServiceProvider, seedDemo: app.Environment.IsDevelopment());
+    // Development always seeds demo data. Production: set Seed__Demo=true in Azure App Settings.
+    var seedDemo = app.Environment.IsDevelopment()
+        || app.Configuration.GetValue("Seed:Demo", false);
+    await backend.Data.DbSeeder.SeedAsync(scope.ServiceProvider, seedDemo: seedDemo);
 }
 
 if (app.Environment.IsDevelopment())

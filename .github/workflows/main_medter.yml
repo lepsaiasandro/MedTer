@@ -70,3 +70,33 @@ jobs:
           app-name: 'medter'
           slot-name: 'Production'
           package: .
+
+      # Optional: set GitHub secrets MEDTER_SQL_CONNECTION_STRING, MEDTER_JWT_KEY, MEDTER_SEED_ADMIN_PASSWORD
+      # Use SQL User ID/Password — not "Active Directory Default"
+      - name: Configure App Service connection + settings
+        if: ${{ secrets.MEDTER_SQL_CONNECTION_STRING != '' }}
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            set -euo pipefail
+            RG=$(az webapp list --query "[?name=='medter'].resourceGroup" -o tsv | head -n1)
+            echo "Resource group: $RG"
+            az webapp config connection-string set \
+              --resource-group "$RG" \
+              --name medter \
+              --connection-string-type SQLAzure \
+              --settings "Default=${SQL_CONNECTION_STRING}"
+            az webapp config appsettings set \
+              --resource-group "$RG" \
+              --name medter \
+              --settings \
+                ASPNETCORE_ENVIRONMENT=Production \
+                Jwt__Key="${JWT_KEY}" \
+                Jwt__Issuer=medter \
+                Jwt__Audience=medter \
+                Seed__AdminPassword="${SEED_ADMIN_PASSWORD}"
+            az webapp restart --resource-group "$RG" --name medter
+        env:
+          SQL_CONNECTION_STRING: ${{ secrets.MEDTER_SQL_CONNECTION_STRING }}
+          JWT_KEY: ${{ secrets.MEDTER_JWT_KEY }}
+          SEED_ADMIN_PASSWORD: ${{ secrets.MEDTER_SEED_ADMIN_PASSWORD }}
