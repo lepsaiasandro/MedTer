@@ -6,9 +6,11 @@ namespace backend.Data;
 
 public static class DbSeeder
 {
+    private const string DemoPassword = "pass123";
+
     /// <param name="seedDemo">
-    /// When true (Development), reset admin password and seed demo users/content.
-    /// When false (Production/Azure), only ensure an admin account exists if missing.
+    /// When true, ensure demo users/content exist (and reset demo passwords to pass123).
+    /// When false (Production without Seed:Demo), only ensure an admin account exists if missing.
     /// </param>
     public static async Task SeedAsync(IServiceProvider services, bool seedDemo = true)
     {
@@ -17,11 +19,14 @@ public static class DbSeeder
 
         const string adminEmail = "admin@medter.ge";
         var admin = await users.FindByEmailAsync(adminEmail);
+        var adminPassword = config["Seed:AdminPassword"];
+        if (string.IsNullOrWhiteSpace(adminPassword))
+            adminPassword = seedDemo ? DemoPassword : null;
+
         if (admin is null)
         {
-            var adminPassword = config["Seed:AdminPassword"];
             if (string.IsNullOrWhiteSpace(adminPassword))
-                adminPassword = seedDemo ? "pass123" : throw new InvalidOperationException(
+                throw new InvalidOperationException(
                     "Seed:AdminPassword is required on first Production boot. Set Seed__AdminPassword in Azure App Settings.");
 
             var adminUser = new ApplicationUser
@@ -41,32 +46,24 @@ public static class DbSeeder
         }
         else if (seedDemo)
         {
-            var adminPassword = config["Seed:AdminPassword"] ?? "pass123";
             admin.Role = UserRole.Admin;
             admin.SetVerification(VerificationStatus.Approved);
             admin.EmailConfirmed = true;
             admin.DisplayName = string.IsNullOrWhiteSpace(admin.DisplayName) ? "ადმინისტრატორი" : admin.DisplayName;
             await users.UpdateAsync(admin);
-
-            // Dev only: restore known demo password so local login never drifts.
-            var token = await users.GeneratePasswordResetTokenAsync(admin);
-            var reset = await users.ResetPasswordAsync(admin, token, adminPassword);
-            if (!reset.Succeeded)
-                throw new InvalidOperationException(
-                    "Failed to reset admin password: " + string.Join("; ", reset.Errors.Select(e => e.Description)));
+            await ResetPasswordAsync(users, admin, adminPassword!);
         }
 
         if (!seedDemo) return;
 
-        // Demo certificates for sample doctors (runs even when users already exist).
+        await EnsureDemoUsersAsync(users);
+        await EnsureDemoAnnouncementsAsync(services);
         await SeedDemoCertificatesAsync(services);
-
-        // Demo training group chat (idempotent).
         await SeedDemoGroupChatAsync(services);
+    }
 
-        // Only seed the demo data once — skip if centers/doctors already exist.
-        if (users.Users.Any(u => u.Role != UserRole.Admin)) return;
-
+    private static async Task EnsureDemoUsersAsync(UserManager<ApplicationUser> users)
+    {
         var centers = new[]
         {
             new { Email = "promed@medter.ge", Name = "ProMed აკადემია", City = "თბილისი", Desc = "კარდიოლოგია და შინაგანი მედიცინა" },
@@ -77,24 +74,41 @@ public static class DbSeeder
 
         foreach (var c in centers)
         {
-            var user = new ApplicationUser
+            var existing = await users.FindByEmailAsync(c.Email);
+            if (existing is null)
             {
-                UserName = c.Email,
-                Email = c.Email,
-                EmailConfirmed = true,
-                Role = UserRole.TrainingCenter,
-                DisplayName = c.Name,
-                CreatedAt = DateTime.UtcNow,
-                TrainingCenterProfile = new TrainingCenterProfile
+                var user = new ApplicationUser
                 {
-                    Name = c.Name,
-                    Description = c.Desc,
-                    City = c.City,
-                    Phone = "555000000"
-                }
-            };
-            user.SetVerification(VerificationStatus.Approved);
-            await users.CreateAsync(user, "pass123");
+                    UserName = c.Email,
+                    Email = c.Email,
+                    EmailConfirmed = true,
+                    Role = UserRole.TrainingCenter,
+                    DisplayName = c.Name,
+                    CreatedAt = DateTime.UtcNow,
+                    TrainingCenterProfile = new TrainingCenterProfile
+                    {
+                        Name = c.Name,
+                        Description = c.Desc,
+                        City = c.City,
+                        Phone = "555000000"
+                    }
+                };
+                user.SetVerification(VerificationStatus.Approved);
+                var create = await users.CreateAsync(user, DemoPassword);
+                if (!create.Succeeded)
+                    throw new InvalidOperationException(
+                        $"Failed to seed {c.Email}: " + string.Join("; ", create.Errors.Select(e => e.Description)));
+            }
+            else
+            {
+                existing.Role = UserRole.TrainingCenter;
+                existing.EmailConfirmed = true;
+                existing.SetVerification(VerificationStatus.Approved);
+                if (string.IsNullOrWhiteSpace(existing.DisplayName))
+                    existing.DisplayName = c.Name;
+                await users.UpdateAsync(existing);
+                await ResetPasswordAsync(users, existing, DemoPassword);
+            }
         }
 
         var doctors = new[]
@@ -106,29 +120,51 @@ public static class DbSeeder
 
         foreach (var d in doctors)
         {
-            var user = new ApplicationUser
+            var existing = await users.FindByEmailAsync(d.Email);
+            if (existing is null)
             {
-                UserName = d.Email,
-                Email = d.Email,
-                EmailConfirmed = true,
-                Role = UserRole.Doctor,
-                DisplayName = $"{d.First} {d.Last}",
-                CreatedAt = DateTime.UtcNow,
-                DoctorProfile = new DoctorProfile
+                var user = new ApplicationUser
                 {
-                    FirstName = d.First,
-                    LastName = d.Last,
-                    Specialty = d.Spec,
-                    City = d.City,
-                    Phone = "555111111"
-                }
-            };
-            user.SetVerification(VerificationStatus.Approved);
-            await users.CreateAsync(user, "pass123");
+                    UserName = d.Email,
+                    Email = d.Email,
+                    EmailConfirmed = true,
+                    Role = UserRole.Doctor,
+                    DisplayName = $"{d.First} {d.Last}",
+                    CreatedAt = DateTime.UtcNow,
+                    DoctorProfile = new DoctorProfile
+                    {
+                        FirstName = d.First,
+                        LastName = d.Last,
+                        Specialty = d.Spec,
+                        City = d.City,
+                        Phone = "555111111"
+                    }
+                };
+                user.SetVerification(VerificationStatus.Approved);
+                var create = await users.CreateAsync(user, DemoPassword);
+                if (!create.Succeeded)
+                    throw new InvalidOperationException(
+                        $"Failed to seed {d.Email}: " + string.Join("; ", create.Errors.Select(e => e.Description)));
+            }
+            else
+            {
+                existing.Role = UserRole.Doctor;
+                existing.EmailConfirmed = true;
+                existing.SetVerification(VerificationStatus.Approved);
+                if (string.IsNullOrWhiteSpace(existing.DisplayName))
+                    existing.DisplayName = $"{d.First} {d.Last}";
+                await users.UpdateAsync(existing);
+                await ResetPasswordAsync(users, existing, DemoPassword);
+            }
         }
+    }
 
-        // Sample announcements from a couple of centers
+    private static async Task EnsureDemoAnnouncementsAsync(IServiceProvider services)
+    {
         var db = services.GetRequiredService<AppDbContext>();
+        if (await db.Announcements.AnyAsync()) return;
+
+        var users = services.GetRequiredService<UserManager<ApplicationUser>>();
         var promed = await users.FindByEmailAsync("promed@medter.ge");
         var medlearn = await users.FindByEmailAsync("medlearn@medter.ge");
 
@@ -169,9 +205,15 @@ public static class DbSeeder
             });
         }
         await db.SaveChangesAsync();
+    }
 
-        // Fresh DB: users were just created, so seed certs now (earlier call was a no-op).
-        await SeedDemoCertificatesAsync(services);
+    private static async Task ResetPasswordAsync(UserManager<ApplicationUser> users, ApplicationUser user, string password)
+    {
+        var token = await users.GeneratePasswordResetTokenAsync(user);
+        var reset = await users.ResetPasswordAsync(user, token, password);
+        if (!reset.Succeeded)
+            throw new InvalidOperationException(
+                $"Failed to reset password for {user.Email}: " + string.Join("; ", reset.Errors.Select(e => e.Description)));
     }
 
     /// <summary>
@@ -180,7 +222,7 @@ public static class DbSeeder
     public static async Task SeedDemoCertificatesAsync(IServiceProvider services)
     {
         var db = services.GetRequiredService<AppDbContext>();
-        if (db.Certificates.Any()) return;
+        if (await db.Certificates.AnyAsync()) return;
 
         var users = services.GetRequiredService<UserManager<ApplicationUser>>();
         var nino = await users.FindByEmailAsync("nino@medter.ge");
@@ -222,7 +264,7 @@ public static class DbSeeder
     public static async Task SeedDemoGroupChatAsync(IServiceProvider services)
     {
         var db = services.GetRequiredService<AppDbContext>();
-        if (db.ChatGroups.Any()) return;
+        if (await db.ChatGroups.AnyAsync()) return;
 
         var users = services.GetRequiredService<UserManager<ApplicationUser>>();
         var center = await users.FindByEmailAsync("promed@medter.ge");
