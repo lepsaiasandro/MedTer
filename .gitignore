@@ -10,6 +10,8 @@ node_modules/
 *.suo
 *.userosscache
 *.sln.docstates
+*.pubxml.user
+PublishProfiles/*.pubxml.user
 
 # Vite / frontend build
 dist/

@@ -1,102 +1,76 @@
-# MedTer — MVP
+# MedTer
 
-სამედიცინო ტრენინგების პლატფორმა. ტრენინგ ცენტრები და ექიმები რეგისტრირდებიან და
-რეალურ დროში (live chat) კომუნიკაციობენ.
+Medical training platform — training centers and doctors register, browse trainings, and chat in real time.
 
-## სტეკი
-- **Backend:** .NET 10 Web API + EF Core (SQL Server / LocalDB) + ASP.NET Identity + JWT + SignalR
-- **Frontend:** React + Vite + TypeScript + Tailwind
+## Stack
+- **Backend:** .NET 10 Web API + EF Core (SQL Server) + ASP.NET Identity + JWT + SignalR
+- **Frontend:** React + Vite + TypeScript + Tailwind (built into backend `wwwroot` on publish)
 
-## ფუნქციონალი (ამ ეტაპზე)
-- ტრენინგ ცენტრის რეგისტრაცია
-- ექიმის რეგისტრაცია
-- შესვლა (JWT)
-- ლაივ ჩატი ცენტრსა და ექიმს შორის (SignalR, real-time)
+## Run locally
 
-> სერტიფიკატები/ქულები ჯერ არ არის — მომავალი ეტაპი.
-
-## სოლუშენი
-`MedTer.sln` (root-ში) შეიცავს **ორ ცალკე პროექტს**:
-- **backend** — `backend/backend.csproj` (.NET API)
-- **medter.client** — `medter.client/medter.client.esproj` (React აპი, JavaScript პროექტი)
-
-Visual Studio-ში გახსენი `MedTer.sln` და ორივე პროექტს დაინახავ.
-
-## გაშვება
-
-### 1. Backend
+### Backend
 ```bash
-cd backend
+cd MedTer-main/backend
 dotnet run
 ```
-გაეშვება `http://localhost:5234`-ზე. მიგრაციები + seed ავტომატურად ეშვება.
+API: `http://localhost:5234`
 
-> ბაზის შესაცვლელად: `backend/appsettings.json` → `ConnectionStrings:Default`.
-
-### 2. Frontend (dev)
+### Frontend (dev)
 ```bash
-cd medter.client
+cd MedTer-main/medter.client
 npm install
 npm run dev
 ```
-გაეშვება `http://localhost:5173`-ზე.
+UI: `http://localhost:5173` (proxies API to local backend)
 
-## სატესტო ანგარიშები (seed)
-პირველ გაშვებაზე ავტომატურად იქმნება. პაროლი ყველას: `pass123`
+### Demo accounts (Development seed only)
+Password: `pass123`  
+Doctors: `nino@medter.ge`, `giorgi@medter.ge`, `mariam@medter.ge`  
+Centers: `promed@medter.ge`, `medlearn@medter.ge`, …  
+Admin: `admin@medter.ge`
 
-**ექიმები:** `nino@medter.ge`, `giorgi@medter.ge`, `mariam@medter.ge`  
-**ტრენინგ ცენტრები:** `promed@medter.ge`, `medlearn@medter.ge`, `vitamed@medter.ge`, `neuroedu@medter.ge`  
-**ადმინი:** `admin@medter.ge`
+## Deploy to Azure App Service
 
-> Meeting / user-test cheat sheet: see `USER_TESTING.md`.  
-> Hosted demo: http://medter.runasp.net
+SPA + API publish as **one** site. `dotnet publish` builds React and copies it into `wwwroot`.
 
-> ქულების პანელი და სერტიფიკატები ამ ეტაპზე frontend-ის mock მონაცემებია (backend ჯერ არ არის).
-> ტრენინგ ცენტრების ფოტოები placeholder-ია (picsum.photos).
+### 1. Create Azure resources
+- **App Service** (Windows or Linux, .NET 10)
+- **Azure SQL Database**
 
-## დაქphოსტვა (MonsterASP.NET — ერთი საიტი)
-ფრონტი backend-ის `wwwroot`-იდან იდება, ანუ ერთ საიტზე მუშაობს ორივე.
-**backend პროექტის publish** ავტომატურად ააგებს React-ს (`npm install` + `npm run build`)
-და ჩასვამს `wwwroot`-ში — ცალკე ნაბიჯი არ სჭირდება.
+### 2. App Settings (Configuration → Application settings)
+| Name | Value |
+|------|--------|
+| `ASPNETCORE_ENVIRONMENT` | `Production` |
+| `ConnectionStrings__Default` | Azure SQL connection string |
+| `Jwt__Key` | Long random secret (32+ chars) |
+| `Jwt__Issuer` | `medter` |
+| `Jwt__Audience` | `medter` |
+| `Seed__AdminPassword` | Initial admin password (first boot only) |
 
-**Visual Studio-დან:** მარჯვენა კლიკი `backend` პროექტზე → **Publish** → WebDeploy პროფილით.
+Optional SMTP: `Email__Smtp__Host`, `Email__Smtp__Port`, `Email__Smtp__User`, `Email__Smtp__Password`, `Email__AppealTo`
 
-**ან CLI-დან:**
+### 3. Publish
+
+**CLI:**
 ```bash
-cd backend
-dotnet publish -c Release -o publish
-# publish/-ის შიგთავსი ატვირთე MonsterASP.NET-ზე
+cd MedTer-main/backend
+dotnet publish -c Release -o ./publish
+# Zip publish/ and deploy via Azure Portal / az webapp deploy / VS Publish
 ```
 
-- Production-ში იყენებს `appsettings.Production.json`-ს (შიდა DB `db63708.databaseasp.net`).
-- ფრონტი production build-ში API-ს **იმავე origin-ზე** (`/api`, `/hubs/chat`) ეძახის — CORS არ სჭირდება.
-- Swagger ხელმისაწვდომია `/swagger`-ზე.
+**Visual Studio:** right-click `backend` → Publish → Azure App Service  
+(or edit `Properties/PublishProfiles/Azure-AppService.pubxml` with your profile)
 
-## სტრუქტურა
+### Notes
+- Production serves the SPA from the same origin (`/api`, `/hubs/chat`) — no CORS needed
+- Swagger is **Development only**
+- Demo users are **not** seeded in Production; only `admin@medter.ge` is created if missing
+- Migrations run automatically on startup
+
+## Project layout
 ```
-backend/
-  Models/        # ApplicationUser, TrainingCenterProfile, DoctorProfile, Message
-  Data/          # AppDbContext (EF Core + Identity)
-  Dtos/          # request/response ობიექტები
-  Services/      # TokenService (JWT)
-  Controllers/   # AuthController, UsersController, ChatController
-  Hubs/          # ChatHub (SignalR)
-  Program.cs     # კონფიგურაცია (DB, Identity, JWT, CORS, SignalR)
-
-frontend/src/
-  api.ts         # axios + token interceptor
-  auth.tsx       # AuthContext (login/logout, localStorage)
-  components/    # Layout (sidebar + header)
-  pages/         # Login, Register, Dashboard, Chat
-  App.tsx        # router + protected routes
+MedTer-main/
+  backend/          .NET API + SignalR + wwwroot (SPA on publish)
+  medter.client/    React source
+  MedTer.sln
 ```
-
-## API
-| Method | Endpoint | აღწერა |
-|--------|----------|--------|
-| POST | `/api/auth/register/training-center` | ცენტრის რეგისტრაცია |
-| POST | `/api/auth/register/doctor` | ექიმის რეგისტრაცია |
-| POST | `/api/auth/login` | შესვლა → JWT |
-| GET  | `/api/users` | კონტაქტები (მოპირდაპირე როლი) |
-| GET  | `/api/chat/{otherUserId}` | მიმოწერის ისტორია |
-| WS   | `/hubs/chat` | SignalR: `SendMessage(receiverId, text)` → `ReceiveMessage` |

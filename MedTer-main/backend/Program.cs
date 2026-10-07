@@ -3,17 +3,16 @@ using backend.Data;
 using backend.Hubs;
 using backend.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-// Swashbuckle 7.x → Microsoft.OpenApi 1.6.x (Microsoft.OpenApi.Models namespace)
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-// Swagger / OpenAPI with JWT bearer support
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -40,7 +39,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Database
+// Database — connection string from appsettings or Azure App Settings (ConnectionStrings__Default)
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
 
@@ -55,11 +54,13 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt =>
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
-// JWT auth
+// JWT auth — Key/Issuer/Audience from config or Azure App Settings (Jwt__Key, etc.)
 var jwt = builder.Configuration.GetSection("Jwt");
+var jwtKey = jwt["Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+    throw new InvalidOperationException("Jwt:Key is not configured. Set Jwt__Key in Azure App Settings.");
 builder.Services.AddAuthentication(options =>
     {
-        // AddIdentity above sets cookie schemes as default; force JWT for the API.
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
         options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
         options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -74,10 +75,9 @@ builder.Services.AddAuthentication(options =>
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwt["Issuer"],
             ValidAudience = jwt["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
         };
 
-        // Allow SignalR to pass the token via the query string on the websocket handshake.
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
@@ -95,13 +95,12 @@ builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<backend.Services.TokenService>();
 
-// Email: real SMTP if configured (Email:Smtp:Host), otherwise a dev logger.
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Email:Smtp:Host"]))
     builder.Services.AddScoped<backend.Services.IEmailSender, backend.Services.SmtpEmailSender>();
 else
     builder.Services.AddScoped<backend.Services.IEmailSender, backend.Services.DevEmailSender>();
 
-// CORS for the React dev server
+// CORS only needed for local Vite; production SPA is same-origin from wwwroot
 builder.Services.AddCors(opt =>
     opt.AddPolicy("frontend", p => p
         .WithOrigins("http://localhost:5173", "http://localhost:5174")
@@ -109,32 +108,45 @@ builder.Services.AddCors(opt =>
         .AllowAnyMethod()
         .AllowCredentials()));
 
+// Azure App Service / reverse proxy: honor X-Forwarded-* headers
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
 
-// Apply migrations + seed test data automatically on startup (simple for MVP)
+app.UseForwardedHeaders();
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
-    await backend.Data.DbSeeder.SeedAsync(scope.ServiceProvider);
+    await backend.Data.DbSeeder.SeedAsync(scope.ServiceProvider, seedDemo: app.Environment.IsDevelopment());
 }
 
-// Swagger UI at /swagger
-app.UseSwagger();
-app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "MedTer API v1"));
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "MedTer API v1"));
+}
 
-// Serve the built React SPA from wwwroot
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
+
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.UseCors("frontend");
+if (app.Environment.IsDevelopment())
+    app.UseCors("frontend");
+
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
-
-// SPA fallback: any non-API/non-file route returns index.html (React Router handles it)
 app.MapFallbackToFile("index.html");
 
 app.Run();

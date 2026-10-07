@@ -6,16 +6,24 @@ namespace backend.Data;
 
 public static class DbSeeder
 {
-    public static async Task SeedAsync(IServiceProvider services)
+    /// <param name="seedDemo">
+    /// When true (Development), reset admin password and seed demo users/content.
+    /// When false (Production/Azure), only ensure an admin account exists if missing.
+    /// </param>
+    public static async Task SeedAsync(IServiceProvider services, bool seedDemo = true)
     {
         var users = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var config = services.GetRequiredService<IConfiguration>();
 
-        // Ensure the platform admin exists (idempotent — also resets password/role on already-seeded DBs).
         const string adminEmail = "admin@medter.ge";
-        const string adminPassword = "pass123";
         var admin = await users.FindByEmailAsync(adminEmail);
         if (admin is null)
         {
+            var adminPassword = config["Seed:AdminPassword"];
+            if (string.IsNullOrWhiteSpace(adminPassword))
+                adminPassword = seedDemo ? "pass123" : throw new InvalidOperationException(
+                    "Seed:AdminPassword is required on first Production boot. Set Seed__AdminPassword in Azure App Settings.");
+
             var adminUser = new ApplicationUser
             {
                 UserName = adminEmail,
@@ -31,21 +39,24 @@ public static class DbSeeder
                 throw new InvalidOperationException(
                     "Failed to seed admin: " + string.Join("; ", create.Errors.Select(e => e.Description)));
         }
-        else
+        else if (seedDemo)
         {
+            var adminPassword = config["Seed:AdminPassword"] ?? "pass123";
             admin.Role = UserRole.Admin;
             admin.SetVerification(VerificationStatus.Approved);
             admin.EmailConfirmed = true;
             admin.DisplayName = string.IsNullOrWhiteSpace(admin.DisplayName) ? "ადმინისტრატორი" : admin.DisplayName;
             await users.UpdateAsync(admin);
 
-            // Always restore the known demo password so login never drifts.
+            // Dev only: restore known demo password so local login never drifts.
             var token = await users.GeneratePasswordResetTokenAsync(admin);
             var reset = await users.ResetPasswordAsync(admin, token, adminPassword);
             if (!reset.Succeeded)
                 throw new InvalidOperationException(
                     "Failed to reset admin password: " + string.Join("; ", reset.Errors.Select(e => e.Description)));
         }
+
+        if (!seedDemo) return;
 
         // Demo certificates for sample doctors (runs even when users already exist).
         await SeedDemoCertificatesAsync(services);
