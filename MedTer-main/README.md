@@ -23,11 +23,19 @@ npm run dev
 ```
 UI: `http://localhost:5173` (proxies API to local backend)
 
-### Demo accounts (Development seed only)
-Password: `pass123`  
-Doctors: `nino@medter.ge`, `giorgi@medter.ge`, `mariam@medter.ge`  
-Centers: `promed@medter.ge`, `medlearn@medter.ge`, …  
-Admin: `admin@medter.ge`
+### Demo accounts (local + Azure when `Seed:Demo` / `Seed__Demo=true`)
+Password for **all**: `pass123`
+
+| Role | Email |
+|------|--------|
+| Admin | `admin@medter.ge` |
+| Center | `promed@medter.ge` |
+| Center | `medlearn@medter.ge` |
+| Center | `vitamed@medter.ge` |
+| Center | `neuroedu@medter.ge` |
+| Doctor | `nino@medter.ge` |
+| Doctor | `giorgi@medter.ge` |
+| Doctor | `mariam@medter.ge` |
 
 ## Deploy to Azure App Service
 

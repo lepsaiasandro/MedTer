@@ -18,11 +18,15 @@ public static class DbSeeder
         var config = services.GetRequiredService<IConfiguration>();
 
         const string adminEmail = "admin@medter.ge";
-        var admin = await users.FindByEmailAsync(adminEmail);
-        var adminPassword = config["Seed:AdminPassword"];
-        if (string.IsNullOrWhiteSpace(adminPassword))
-            adminPassword = seedDemo ? DemoPassword : null;
+        // Demo mode: all accounts (admin included) use pass123.
+        // Production without demo: require Seed:AdminPassword for first admin create.
+        var adminPassword = seedDemo
+            ? DemoPassword
+            : config["Seed:AdminPassword"];
+        if (!seedDemo && string.IsNullOrWhiteSpace(adminPassword))
+            adminPassword = null;
 
+        var admin = await users.FindByEmailAsync(adminEmail);
         if (admin is null)
         {
             if (string.IsNullOrWhiteSpace(adminPassword))
@@ -44,14 +48,15 @@ public static class DbSeeder
                 throw new InvalidOperationException(
                     "Failed to seed admin: " + string.Join("; ", create.Errors.Select(e => e.Description)));
         }
-        else if (seedDemo)
+        else
         {
             admin.Role = UserRole.Admin;
             admin.SetVerification(VerificationStatus.Approved);
             admin.EmailConfirmed = true;
             admin.DisplayName = string.IsNullOrWhiteSpace(admin.DisplayName) ? "ადმინისტრატორი" : admin.DisplayName;
             await users.UpdateAsync(admin);
-            await ResetPasswordAsync(users, admin, adminPassword!);
+            if (seedDemo)
+                await ResetPasswordAsync(users, admin, DemoPassword);
         }
 
         if (!seedDemo) return;
