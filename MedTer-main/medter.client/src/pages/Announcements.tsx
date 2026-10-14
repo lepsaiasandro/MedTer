@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import { Calendar, Pin, Mail, Search, Check, Bookmark, Cap, Clock, Chat, X, Funnel } from "../components/icons";
+import { Calendar, Pin, Mail, Search, Check, Bookmark, Cap, Chat, X } from "../components/icons";
 import ShareMenu from "../components/ShareMenu";
 import PointsPanel from "../components/PointsPanel";
 import MediaPlaceholder from "../components/MediaPlaceholder";
@@ -60,7 +60,6 @@ export default function Announcements() {
   const [category, setCategory] = useState("");
   const [format, setFormat] = useState("");
   const [city, setCity] = useState("");
-  const [price, setPrice] = useState("");
   const [sort, setSort] = useState("newest");
   const [favOnly, setFavOnly] = useState(false);
 
@@ -148,7 +147,9 @@ export default function Announcements() {
 
       if (nextInterested) {
         setMineItems((prev) => {
-          if (prev.some((x) => x.id === a.id)) return prev.map((x) => (x.id === a.id ? { ...x, isInterested: true, interestedCount: nextCount } : x));
+          if (prev.some((x) => x.id === a.id)) {
+            return prev.map((x) => (x.id === a.id ? { ...x, isInterested: true, interestedCount: nextCount } : x));
+          }
           return [{ ...a, isInterested: true, interestedCount: nextCount }, ...prev];
         });
         setFlash({
@@ -158,10 +159,7 @@ export default function Announcements() {
         });
       } else {
         setMineItems((prev) => prev.filter((x) => x.id !== a.id));
-        setFlash({
-          kind: "ok",
-          text: t("რეგისტრაცია გაუქმდა", "Registration cancelled"),
-        });
+        setFlash({ kind: "ok", text: t("რეგისტრაცია გაუქმდა", "Registration cancelled") });
       }
       void load({ soft: true });
     } catch {
@@ -197,8 +195,6 @@ export default function Announcements() {
       if (category && a.category !== category) return false;
       if (format && a.format !== format) return false;
       if (city && a.city !== city) return false;
-      if (price === "free" && a.price > 0) return false;
-      if (price === "paid" && a.price === 0) return false;
       if (!mineTab && favOnly && !a.isFavorite) return false;
       return true;
     });
@@ -206,13 +202,11 @@ export default function Announcements() {
     else if (sort === "points") list = [...list].sort((a, b) => b.points - a.points);
     else if (sort === "interested") list = [...list].sort((a, b) => b.interestedCount - a.interestedCount);
     return list;
-  }, [source, search, category, format, city, price, favOnly, sort, mineTab]);
+  }, [source, search, category, format, city, favOnly, sort, mineTab]);
 
   const clearFilters = () => {
-    setSearch(""); setCategory(""); setFormat(""); setCity(""); setPrice(""); setFavOnly(false);
+    setSearch(""); setCategory(""); setFormat(""); setCity(""); setFavOnly(false);
   };
-
-  const filtersActive = !!(search || category || format || city || price || favOnly);
 
   return (
     <div className="announcements-layout">
@@ -226,7 +220,7 @@ export default function Announcements() {
               <p>{flash.text}</p>
               {flash.actionMine && isDoctor && (
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTab(true)}>
-                  {t("ჩემი ტრენინგების ნახვა", "View my trainings")}
+                  {t("ჩემი ტრენინგები", "My trainings")}
                 </button>
               )}
             </div>
@@ -236,84 +230,67 @@ export default function Announcements() {
           </div>
         )}
 
-        <header className="train-hero">
-          <div className="train-hero-copy">
-            <p className="train-kicker">{t("კატალოგი", "Catalog")}</p>
+        <div className="page-head">
+          <div className="h-text">
             <h1>{mineTab ? t("ჩემი ტრენინგები", "My Trainings") : t("ტრენინგები", "Trainings")}</h1>
             <p>
               {mineTab
-                ? t(
-                    "ტრენინგები, რომლებზეც დარეგისტრირებული ხარ — თარიღი, ადგილი და სხვა დეტალები",
-                    "Trainings you are registered for — date, place and other details"
-                  )
-                : t("დაათვალიერე კონფერენციები და ტრენინგები, დაარეგისტრირდი", "Browse conferences and trainings, register")}
+                ? t("შენი რეგისტრაციები — თარიღი და დეტალები", "Your registrations — dates and details")
+                : t("დაათვალიერე და დაარეგისტრირდი", "Browse and register")}
             </p>
           </div>
-          {!loading && (
-            <div className="train-hero-stat" aria-live="polite">
-              <strong>{visible.length}</strong>
-              <span>{mineTab ? t("რეგისტრაცია", "registrations") : t("განცხადება", "listings")}</span>
-            </div>
-          )}
-        </header>
+        </div>
 
         {isDoctor && (
-          <div className="segment train-tabs">
+          <div className="segment" style={{ marginBottom: 16 }}>
             <button type="button" className={!mineTab ? "active" : ""} onClick={() => setTab(false)}>
               {t("ყველა", "All")}
             </button>
             <button type="button" className={mineTab ? "active" : ""} onClick={() => setTab(true)}>
-              {t("ჩემი ტრენინგები", "My Trainings")}
+              {t("ჩემი", "Mine")}
               <span className="count">{registeredCount}</span>
             </button>
           </div>
         )}
 
-        <div className="train-filters">
-          <div className="train-filters-label">
-            <Funnel size={15} />
-            <span>{t("ფილტრები", "Filters")}</span>
-            {filtersActive && (
-              <button type="button" className="btn btn-text btn-sm" onClick={clearFilters}>
-                {t("გასუფთავება", "Clear")}
-              </button>
-            )}
+        <div className="toolbar">
+          <div className="search" style={{ marginLeft: 0, maxWidth: 280 }}>
+            <Search size={16} />
+            <input placeholder={t("ძებნა…", "Search…")} value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <div className="toolbar train-toolbar">
-            <select className="control" style={{ width: "auto" }} value={category} onChange={(e) => setCategory(e.target.value)}>
-              <option value="">{t("ყველა კატეგორია", "All categories")}</option>
-              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select className="control" style={{ width: "auto" }} value={format} onChange={(e) => setFormat(e.target.value)}>
-              <option value="">{t("ყველა ფორმატი", "All formats")}</option>
-              <option value="ონლაინ">{t("ონლაინ", "Online")}</option>
-              <option value="დასწრებით">{t("დასწრებით", "In person")}</option>
-            </select>
-            <select className="control" style={{ width: "auto" }} value={city} onChange={(e) => setCity(e.target.value)}>
-              <option value="">{t("ყველა ქალაქი", "All cities")}</option>
-              {cities.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select className="control" style={{ width: "auto" }} value={price} onChange={(e) => setPrice(e.target.value)}>
-              <option value="">{t("ფასი: ყველა", "Price: all")}</option>
-              <option value="free">{t("უფასო", "Free")}</option>
-              <option value="paid">{t("ფასიანი", "Paid")}</option>
-            </select>
-            <select className="control" style={{ width: "auto" }} value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="newest">{t("უახლესი", "Newest")}</option>
-              <option value="date">{t("თარიღით", "By date")}</option>
-              <option value="points">{t("ქულით", "By points")}</option>
-              <option value="interested">{t("პოპულარობით", "By popularity")}</option>
-            </select>
-            {isDoctor && !mineTab && (
-              <button className={`select-mini ${favOnly ? "active" : ""}`} style={favOnly ? { borderColor: "var(--brand)", color: "var(--brand)" } : undefined} onClick={() => setFavOnly((v) => !v)}>
-                <Bookmark size={15} filled={favOnly} /> {t("რჩეულები", "Favorites")}
-              </button>
-            )}
-            <div className="search">
-              <Search size={16} />
-              <input placeholder={t("ძებნა სათაურით…", "Search by title…")} value={search} onChange={(e) => setSearch(e.target.value)} />
-            </div>
-          </div>
+          <select className="control" style={{ width: "auto" }} value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="">{t("კატეგორია", "Category")}</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select className="control" style={{ width: "auto" }} value={format} onChange={(e) => setFormat(e.target.value)}>
+            <option value="">{t("ფორმატი", "Format")}</option>
+            <option value="ონლაინ">{t("ონლაინ", "Online")}</option>
+            <option value="დასწრებით">{t("დასწრებით", "In person")}</option>
+          </select>
+          <select className="control" style={{ width: "auto" }} value={city} onChange={(e) => setCity(e.target.value)}>
+            <option value="">{t("ქალაქი", "City")}</option>
+            {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select className="control" style={{ width: "auto" }} value={sort} onChange={(e) => setSort(e.target.value)}>
+            <option value="newest">{t("უახლესი", "Newest")}</option>
+            <option value="date">{t("თარიღით", "By date")}</option>
+            <option value="points">{t("ქულით", "By points")}</option>
+          </select>
+          {isDoctor && !mineTab && (
+            <button
+              type="button"
+              className={`select-mini ${favOnly ? "active" : ""}`}
+              style={favOnly ? { borderColor: "var(--brand)", color: "var(--brand)" } : undefined}
+              onClick={() => setFavOnly((v) => !v)}
+            >
+              <Bookmark size={15} filled={favOnly} />
+            </button>
+          )}
+          {(search || category || format || city || favOnly) && (
+            <button type="button" className="btn btn-text btn-sm" onClick={clearFilters}>
+              {t("გასუფთავება", "Clear")}
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -322,10 +299,7 @@ export default function Announcements() {
           <EmptyState
             icon={<Cap size={42} sw={1.6} />}
             title={t("ჯერ არ გაქვს რეგისტრაცია", "No registrations yet")}
-            text={t(
-              "ტრენინგზე რეგისტრაციის შემდეგ ის აქ გამოჩნდება სრული ინფორმაციით.",
-              "After you register for a training, it will appear here with full details."
-            )}
+            text={t("ტრენინგზე რეგისტრაციის შემდეგ ის აქ გამოჩნდება.", "After you register, it will appear here.")}
             action={
               <button className="btn btn-primary btn-sm" onClick={() => setTab(false)}>
                 {t("ტრენინგების ნახვა", "Browse trainings")}
@@ -336,7 +310,7 @@ export default function Announcements() {
           <EmptyState
             icon={<Calendar size={42} sw={1.6} />}
             title={t("ჯერ არ არის ტრენინგები", "No trainings yet")}
-            text={t("როგორც კი ტრენინგ ცენტრები გამოაქვეყნებენ განცხადებებს, აქ დაინახავ.", "Once training centers publish announcements, you'll see them here.")}
+            text={t("როგორც კი ცენტრები გამოაქვეყნებენ, აქ დაინახავ.", "Once centers publish, you'll see them here.")}
           />
         ) : visible.length === 0 ? (
           <EmptyState
@@ -345,45 +319,51 @@ export default function Announcements() {
             text={t("შეცვალე ფილტრები ან საძიებო სიტყვა.", "Try different filters or search terms.")}
             action={
               <button className="btn btn-ghost btn-sm" onClick={clearFilters}>
-                {t("ფილტრის გასუფთავება", "Clear filters")}
+                {t("გასუფთავება", "Clear")}
               </button>
             }
           />
         ) : (
-          <div className="train-grid">
+          <div className="grid">
             {visible.map((a, i) => {
               const open = expanded === a.id;
-              const blurb = a.shortDescription || a.description;
               const online = a.format === "ონლაინ";
+              const place = online
+                ? t("ონლაინ", "Online")
+                : (a.city || t("დასწრებით", "In person"));
               const priceLabel = a.price > 0 ? `${a.price} ₾` : t("უფასო", "Free");
+
               return (
                 <article
                   key={a.id}
-                  className={`train-card reveal${a.isInterested ? " train-card--mine" : ""}`}
+                  className={`card card-interactive reveal${a.isInterested ? " card-pulse" : ""}`}
                   style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
                 >
-                  <div className="train-card-media">
+                  <div className="media">
                     {a.imageUrl
                       ? <img src={a.imageUrl} alt="" />
                       : <MediaPlaceholder title={a.title} subtitle={a.centerName} variant={a.points > 0 ? "teal" : "navy"} />}
-                    <div className="train-card-badges">
-                      {a.points > 0 && (
-                        <span className="train-pill train-pill--pts">
-                          <span className="tealdot" /> {a.points} {t("ქულა", "pts")}
-                        </span>
-                      )}
-                      {mineTab || a.isInterested ? (
-                        <span className="train-pill train-pill--ok">
-                          <Check size={12} /> {t("დარეგისტრირებული", "Registered")}
-                        </span>
-                      ) : a.points > 0 ? (
-                        <span className="train-pill train-pill--cpd">{t("უსდ", "CPD")}</span>
-                      ) : null}
-                    </div>
+                    {a.points > 0 && (
+                      <span className="badge-points">
+                        <span className="tealdot" /> {a.points} {t("ქულა", "pts")}
+                      </span>
+                    )}
+                    {(mineTab || a.isInterested) && (
+                      <span className="trust-chip trust-chip--ok" style={{ position: "absolute", top: 10, right: 10, zIndex: 2 }}>
+                        <Check size={12} /> {t("დარეგისტრირებული", "Registered")}
+                      </span>
+                    )}
                     {isDoctor && !mineTab && (
                       <button
-                        className="train-fav"
-                        title={t("რჩეულებში დამატება", "Add to favorites")}
+                        className="act"
+                        title={t("რჩეულები", "Favorites")}
+                        style={{
+                          position: "absolute",
+                          bottom: 8,
+                          right: 8,
+                          background: "rgba(255,255,255,.92)",
+                          color: a.isFavorite ? "var(--brand)" : "var(--muted)",
+                        }}
                         onClick={() => toggleFav(a)}
                       >
                         <Bookmark size={16} filled={a.isFavorite} />
@@ -391,24 +371,14 @@ export default function Announcements() {
                     )}
                   </div>
 
-                  <div className="train-card-body">
-                    <div className="train-card-tags">
-                      {a.category && <span className="chip-cat">{a.category}</span>}
-                      <span className={`train-format ${online ? "is-online" : ""}`}>
-                        {online ? t("ონლაინ", "Online") : t("დასწრებით", "In person")}
-                      </span>
-                    </div>
-
+                  <div className="body">
+                    {a.category && <span className="chip-cat">{a.category}</span>}
                     <h3>{a.title}</h3>
-                    <div className="train-center">
+                    <div style={{ fontSize: 12.5, color: "var(--soft)", marginTop: -4 }}>
                       {a.centerUserId
-                        ? <Link to={`/centers/${a.centerUserId}`}>{a.centerName}</Link>
+                        ? <Link to={`/centers/${a.centerUserId}`} style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 2 }}>{a.centerName}</Link>
                         : a.centerName}
                     </div>
-
-                    {!mineTab && blurb && (
-                      <p className="train-blurb">{blurb}</p>
-                    )}
 
                     <div className="meta">
                       {a.startDate && (
@@ -418,108 +388,86 @@ export default function Announcements() {
                       )}
                       <div className="row">
                         {online ? <Mail size={15} /> : <Pin size={15} />}
-                        {online
-                          ? t("ონლაინ კურსი", "Online course")
-                          : `${a.city ? a.city + " · " : ""}${t("დასწრებით", "In person")}`}
+                        {place}
                       </div>
-                      {(mineTab || open) && a.duration && (
-                        <div className="row"><Clock size={15} /> {a.duration}</div>
-                      )}
-                      {mineTab && a.registrationDeadline && (
-                        <div className="row">
-                          <Cap size={15} /> {t("რეგისტრაციის ვადა", "Registration deadline")}: {fmtDate(a.registrationDeadline)}
-                        </div>
-                      )}
                     </div>
-
-                    {mineTab && blurb && !open && (
-                      <p className="train-blurb">{blurb}</p>
-                    )}
 
                     {mineTab && open && (
                       <div className="train-details">
-                        {(a.shortDescription || a.description) && (
+                        {(a.description || a.shortDescription) && (
                           <p>{a.description || a.shortDescription}</p>
                         )}
                         <div className="train-details-grid">
+                          <div>
+                            <span>{t("ფასი", "Price")}</span>
+                            <b>{priceLabel}</b>
+                          </div>
+                          {a.duration && (
+                            <div>
+                              <span>{t("ხანგრძლივობა", "Duration")}</span>
+                              <b>{a.duration}</b>
+                            </div>
+                          )}
                           {a.language && (
                             <div>
                               <span>{t("ენა", "Language")}</span>
                               <b>{a.language}</b>
                             </div>
                           )}
-                          <div>
-                            <span>{t("ფასი", "Price")}</span>
-                            <b>{priceLabel}</b>
-                          </div>
-                          {a.seats != null && a.seats > 0 && (
+                          {a.registrationDeadline && (
                             <div>
-                              <span>{t("ადგილები", "Seats")}</span>
-                              <b>{a.interestedCount}/{a.seats}</b>
-                            </div>
-                          )}
-                          {a.type && (
-                            <div>
-                              <span>{t("ტიპი", "Type")}</span>
-                              <b>{a.type}</b>
+                              <span>{t("ვადა", "Deadline")}</span>
+                              <b>{fmtDate(a.registrationDeadline)}</b>
                             </div>
                           )}
                         </div>
                       </div>
                     )}
 
-                    <div className="train-card-foot">
-                      <div className="train-price-row">
-                        <strong className={a.price > 0 ? "" : "is-free"}>{priceLabel}</strong>
-                        <span>{a.interestedCount} {t("დაინტერესდა", "interested")}</span>
-                      </div>
-
-                      {mineTab ? (
-                        <div className="train-card-actions">
-                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setExpanded(open ? null : a.id)}>
-                            {open ? t("შემოკლება", "Show less") : t("დეტალები", "Details")}
-                          </button>
-                          {a.hasGroupChat && (
-                            <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate("/chat")}>
-                              <Chat size={14} /> {t("ჯგუფის ჩატი", "Group chat")}
+                    <div className="foot">
+                      <span style={{ fontSize: 13.5, fontWeight: 700, color: a.price > 0 ? "var(--text)" : "var(--success)" }}>
+                        {priceLabel}
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {mineTab ? (
+                          <>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setExpanded(open ? null : a.id)}>
+                              {open ? t("ნაკლები", "Less") : t("დეტალები", "Details")}
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            style={{ color: "var(--danger)" }}
-                            disabled={busyId === a.id}
-                            onClick={() => toggleInterest(a)}
-                          >
-                            {busyId === a.id ? "..." : t("გაუქმება", "Leave")}
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="train-card-actions">
-                          <ShareMenu title={a.title} />
-                          {isDoctor && (
-                            a.isInterested
-                              ? (
-                                <button
-                                  className="pill-interest on"
-                                  disabled={busyId === a.id}
-                                  onClick={() => toggleInterest(a)}
-                                >
-                                  <Check size={14} /> {busyId === a.id ? "..." : t("დარეგისტრირებული", "Registered")}
-                                </button>
-                              )
-                              : (
-                                <button
-                                  className="btn btn-primary btn-sm"
-                                  disabled={busyId === a.id}
-                                  onClick={() => toggleInterest(a)}
-                                >
-                                  {busyId === a.id ? "..." : t("რეგისტრაცია", "Register")}
-                                </button>
-                              )
-                          )}
-                        </div>
-                      )}
+                            {a.hasGroupChat && (
+                              <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate("/chat")}>
+                                <Chat size={14} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="btn btn-text btn-sm"
+                              style={{ color: "var(--danger)" }}
+                              disabled={busyId === a.id}
+                              onClick={() => toggleInterest(a)}
+                            >
+                              {busyId === a.id ? "..." : t("გაუქმება", "Leave")}
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <ShareMenu title={a.title} />
+                            {isDoctor && (
+                              a.isInterested
+                                ? (
+                                  <button className="pill-interest on" disabled={busyId === a.id} onClick={() => toggleInterest(a)}>
+                                    <Check size={14} /> {busyId === a.id ? "..." : t("დარეგისტრირებული", "Registered")}
+                                  </button>
+                                )
+                                : (
+                                  <button className="btn btn-primary btn-sm" disabled={busyId === a.id} onClick={() => toggleInterest(a)}>
+                                    {busyId === a.id ? "..." : t("რეგისტრაცია", "Register")}
+                                  </button>
+                                )
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </article>
