@@ -4,6 +4,7 @@ import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
 import { Sun, Moon, Check } from "../components/icons";
+import LinearAdBanner from "../components/LinearAdBanner";
 import logoIcon from "../assets/medter-icon.png";
 
 type Role = "TrainingCenter" | "Doctor";
@@ -93,20 +94,33 @@ export default function Register() {
               profilePhotoUrl: photoUrl || null,
             };
       const { data } = await api.post(url, body);
-      if (data?.token) {
+      const token = data?.token ?? data?.Token;
+      if (token) {
+        const nextRole = data.role ?? data.Role;
         login({
-          token: data.token,
-          userId: data.userId,
-          displayName: data.displayName,
-          role: data.role,
-          profilePhotoUrl: data.profilePhotoUrl,
+          token,
+          userId: data.userId ?? data.UserId,
+          displayName: data.displayName ?? data.DisplayName,
+          role: nextRole,
+          profilePhotoUrl: data.profilePhotoUrl ?? data.ProfilePhotoUrl,
         });
-        navigate(data.role === "TrainingCenter" ? "/my-announcements" : "/announcements");
+        navigate(
+          nextRole === "TrainingCenter" ? "/my-announcements?welcome=1" : "/announcements?welcome=1",
+          { replace: true }
+        );
         return;
       }
+      // Pending admin approval — always show confirmation (never leave a blank screen).
       setDone(true);
     } catch (err: any) {
-      const msg = Array.isArray(err?.response?.data) ? err.response.data.join(", ") : t("რეგისტრაცია ვერ მოხერხდა", "Registration failed");
+      const raw = err?.response?.data;
+      const msg = Array.isArray(raw)
+        ? raw.map((x: any) => (typeof x === "string" ? x : x?.description || x?.Description || String(x))).join(", ")
+        : typeof raw?.message === "string"
+          ? raw.message
+          : typeof raw === "string"
+            ? raw
+            : t("რეგისტრაცია ვერ მოხერხდა", "Registration failed");
       setError(msg);
     } finally {
       setLoading(false);
@@ -138,32 +152,58 @@ export default function Register() {
 
   if (done) {
     return (
-      <div className="auth-shell">
-        <AuthPrefs />
-        {brandPanel}
-        <div className="auth-wrap auth-wrap--panel">
-          <div className="auth-card" style={{ maxWidth: 460, textAlign: "center" }}>
-            <div className="auth-logo auth-logo--mobile">
-              <img src={logoIcon} alt="" className="logo-mark-img" />
-              <span className="logo-name">Med<span>Ter</span></span>
+      <>
+        <LinearAdBanner />
+        <div className="auth-shell">
+          <AuthPrefs />
+          {brandPanel}
+          <div className="auth-wrap auth-wrap--panel">
+            <div className="auth-card" style={{ maxWidth: 460, textAlign: "center" }}>
+              <div className="auth-logo auth-logo--mobile">
+                <img src={logoIcon} alt="" className="logo-mark-img" />
+                <span className="logo-name">Med<span>Ter</span></span>
+              </div>
+              <div className="auth-success-icon" aria-hidden="true">
+                <Check size={28} />
+              </div>
+              <div className="auth-title">{t("განაცხადი მიღებულია", "Application received")}</div>
+              <div className="auth-sub" style={{ marginBottom: 16 }}>
+                {t(
+                  "რეგისტრაცია წარმატებით გაიგზავნა. ანგარიში ადმინის დამტკიცებას ელოდება — შემდეგ შეძლებთ შესვლას.",
+                  "Registration submitted successfully. Your account awaits admin approval — then you can sign in."
+                )}
+              </div>
+              <p style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 14 }}>
+                {t("ელფოსტა", "Email")}: <b style={{ color: "var(--text)" }}>{form.email}</b>
+              </p>
+              <ul className="auth-success-steps">
+                <li>
+                  <span className="n">1</span>
+                  {t("ადმინი განიხილავს თქვენს განაცხადს", "An admin will review your application")}
+                </li>
+                <li>
+                  <span className="n">2</span>
+                  {t("დამტკიცების შემდეგ შედით იმავე ელფოსტით", "After approval, sign in with the same email")}
+                </li>
+                <li>
+                  <span className="n">3</span>
+                  {role === "Doctor"
+                    ? t("დაიწყეთ ტრენინგების ძიება და რეგისტრაცია", "Start browsing and registering for trainings")
+                    : t("შექმენით და გამოაქვეყნეთ ტრენინგები", "Create and publish trainings")}
+                </li>
+              </ul>
+              <Link to="/" className="btn btn-primary btn-block btn-lg">{t("მთავარ გვერდზე", "Back to home")}</Link>
             </div>
-            <div className="auth-title">{t("განაცხადი მიღებულია", "Application received")}</div>
-            <div className="auth-sub" style={{ marginBottom: 20 }}>
-              {t(
-                "თქვენი ანგარიში ადმინისტრატორის დამტკიცებას ელოდება. დამტკიცების შემდეგ შეძლებთ სისტემაში შესვლას.",
-                "Your account is awaiting administrator approval. You can sign in once it has been approved."
-              )}
-            </div>
-            <p style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 18 }}>{form.email}</p>
-            <Link to="/" className="btn btn-primary btn-block btn-lg">{t("მთავარ გვერდზე", "Back to home")}</Link>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="auth-shell">
+    <>
+      <LinearAdBanner />
+      <div className="auth-shell">
       <AuthPrefs />
       {brandPanel}
       <div className="auth-wrap auth-wrap--panel">
@@ -247,5 +287,6 @@ export default function Register() {
         </form>
       </div>
     </div>
+    </>
   );
 }

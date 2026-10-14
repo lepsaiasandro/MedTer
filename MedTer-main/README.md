@@ -23,6 +23,27 @@ npm run dev
 ```
 UI: `http://localhost:5173` (proxies API to local backend)
 
+### Center Pro subscription (test)
+
+Training centers need an active **Center Pro** plan to **publish** trainings (drafts stay free).
+
+1. Sign in as a center (e.g. `promed@medter.ge` / `pass123`)
+2. Open **Pricing** (`/pricing`)
+3. Click **Test activate (no card)** — works in Development without Stripe keys
+4. Or configure Stripe Test Mode in `appsettings.json` / env:
+
+| Setting | Example |
+|---------|---------|
+| `Stripe__SecretKey` | `sk_test_…` |
+| `Stripe__PublishableKey` | `pk_test_…` |
+| `Stripe__WebhookSecret` | `whsec_…` |
+| `Stripe__CenterProPriceId` | `price_…` (monthly product price) |
+| `Stripe__PublicAppUrl` | `http://localhost:5173` |
+| `Stripe__AllowFakeSubscribe` | `true` (dev) |
+
+Webhook URL: `POST /api/billing/webhook`  
+Test card: `4242 4242 4242 4242`
+
 ### Demo accounts (local + Azure when `Seed:Demo` / `Seed__Demo=true`)
 Password for **all**: `pass123`
 

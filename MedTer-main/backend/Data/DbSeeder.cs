@@ -59,12 +59,73 @@ public static class DbSeeder
                 await ResetPasswordAsync(users, admin, DemoPassword);
         }
 
+        await SeedDefaultAdBannersAsync(services);
+
         if (!seedDemo) return;
 
         await EnsureDemoUsersAsync(users);
         await EnsureDemoAnnouncementsAsync(services);
         await SeedDemoCertificatesAsync(services);
         await SeedDemoGroupChatAsync(services);
+    }
+
+    /// <summary>Seed PSP / Aversi partner banners once if the table is empty.</summary>
+    public static async Task SeedDefaultAdBannersAsync(IServiceProvider services)
+    {
+        var db = services.GetRequiredService<AppDbContext>();
+        if (await db.AdBanners.AnyAsync()) return;
+
+        db.AdBanners.AddRange(
+            new AdBanner
+            {
+                Brand = "PSP",
+                Href = "https://psp.ge/",
+                TitleKa = "PSP — ონლაინ აფთიაქი",
+                TitleEn = "PSP — online pharmacy",
+                TextKa = "45,000+ პროდუქტი, სწრაფი მიწოდება და გარანტირებული ხარისხი.",
+                TextEn = "45,000+ products, fast delivery and guaranteed quality.",
+                CtaKa = "პსპ.გე",
+                CtaEn = "Visit PSP",
+                Accent = "#1e4d8c",
+                Accent2 = "#0f2d5c",
+                SortOrder = 0,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new AdBanner
+            {
+                Brand = "Aversi",
+                Href = "https://www.aversi.ge/",
+                TitleKa = "ავერსი — აფთიაქები მთელ საქართველოში",
+                TitleEn = "Aversi — pharmacies across Georgia",
+                TextKa = "აფთიაქები, ონლაინ შეკვეთა და მტრედი ბარათის შეთავაზებები.",
+                TextEn = "Pharmacies, online ordering and Mtredi card offers.",
+                CtaKa = "ავერსი.გე",
+                CtaEn = "Visit Aversi",
+                Accent = "#c8102e",
+                Accent2 = "#8b0a1e",
+                SortOrder = 1,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new AdBanner
+            {
+                Brand = "Aversi",
+                Href = "https://shop.aversi.ge/",
+                TitleKa = "ავერსი ონლაინ მაღაზია",
+                TitleEn = "Aversi online shop",
+                TextKa = "შეუკვეთე მედიკამენტები და პროდუქტები სახლიდან.",
+                TextEn = "Order medicines and products from home.",
+                CtaKa = "ონლაინ შეკვეთა",
+                CtaEn = "Shop online",
+                Accent = "#c8102e",
+                Accent2 = "#9f1239",
+                SortOrder = 2,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+
+        await db.SaveChangesAsync();
     }
 
     private static async Task EnsureDemoUsersAsync(UserManager<ApplicationUser> users)

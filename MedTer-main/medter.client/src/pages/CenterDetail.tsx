@@ -148,8 +148,8 @@ export default function CenterDetail() {
                     <ShareMenu title={a.title} />
                     {isDoctor && (
                       a.isInterested
-                        ? <button className="pill-interest on" onClick={() => toggleInterest(a)}><Check size={14} /> {t("დაინტერესებული", "Interested")}</button>
-                        : <button className="btn btn-primary btn-sm" onClick={() => toggleInterest(a)}>{t("დაინტერესება", "Interested?")}</button>
+                        ? <button className="pill-interest on" onClick={() => toggleInterest(a)}><Check size={14} /> {t("დარეგისტრირებული", "Registered")}</button>
+                        : <button className="btn btn-primary btn-sm" onClick={() => toggleInterest(a)}>{t("რეგისტრაცია", "Register")}</button>
                     )}
                   </div>
                 </div>

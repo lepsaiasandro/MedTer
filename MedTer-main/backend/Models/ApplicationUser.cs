@@ -43,6 +43,18 @@ public class ApplicationUser : IdentityUser
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // ── Center Pro subscription (Stripe test / fake activate) ──────────────
+    /// <summary>none | active | past_due | canceled | trialing</summary>
+    public string SubscriptionStatus { get; set; } = "none";
+    public string? SubscriptionPlanId { get; set; }
+    public DateTime? SubscriptionCurrentPeriodEnd { get; set; }
+    public string? StripeCustomerId { get; set; }
+    public string? StripeSubscriptionId { get; set; }
+
+    public bool HasActiveCenterSubscription =>
+        string.Equals(SubscriptionStatus, "active", StringComparison.OrdinalIgnoreCase)
+        && (SubscriptionCurrentPeriodEnd is null || SubscriptionCurrentPeriodEnd > DateTime.UtcNow);
+
     public TrainingCenterProfile? TrainingCenterProfile { get; set; }
     public DoctorProfile? DoctorProfile { get; set; }
 

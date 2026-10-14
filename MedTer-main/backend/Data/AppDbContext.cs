@@ -22,6 +22,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Favorite> Favorites => Set<Favorite>();
     public DbSet<ProfileChangeRequest> ProfileChangeRequests => Set<ProfileChangeRequest>();
     public DbSet<AppSettings> AppSettings => Set<AppSettings>();
+    public DbSet<AdBanner> AdBanners => Set<AdBanner>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -37,6 +38,10 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<TrainingCenterProfile>()
             .Property(p => p.AnnouncementVerificationEnabled)
             .HasDefaultValue(true);
+
+        builder.Entity<ApplicationUser>()
+            .Property(u => u.SubscriptionStatus)
+            .HasDefaultValue("none");
 
         builder.Entity<ApplicationUser>()
             .HasOne(u => u.TrainingCenterProfile)
@@ -141,5 +146,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<Favorite>()
             .HasOne(f => f.Doctor).WithMany().HasForeignKey(f => f.DoctorUserId).OnDelete(DeleteBehavior.NoAction);
         builder.Entity<Favorite>().HasIndex(f => new { f.AnnouncementId, f.DoctorUserId }).IsUnique();
+
+        builder.Entity<AdBanner>().HasIndex(a => new { a.IsActive, a.SortOrder });
     }
 }

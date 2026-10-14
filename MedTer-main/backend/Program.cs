@@ -98,6 +98,17 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<backend.Services.TokenService>();
+builder.Services.Configure<backend.Services.StripeOptions>(
+    builder.Configuration.GetSection(backend.Services.StripeOptions.SectionName));
+// Development: allow fake subscribe unless explicitly disabled in config
+builder.Services.PostConfigure<backend.Services.StripeOptions>(opt =>
+{
+    if (builder.Environment.IsDevelopment() && !builder.Configuration.GetSection("Stripe").Exists())
+        opt.AllowFakeSubscribe = true;
+    else if (builder.Environment.IsDevelopment()
+             && !builder.Configuration.GetValue<bool?>("Stripe:AllowFakeSubscribe").HasValue)
+        opt.AllowFakeSubscribe = true;
+});
 
 if (!string.IsNullOrWhiteSpace(builder.Configuration["Email:Smtp:Host"]))
     builder.Services.AddScoped<backend.Services.IEmailSender, backend.Services.SmtpEmailSender>();
@@ -107,7 +118,11 @@ else
 // CORS only needed for local Vite; production SPA is same-origin from wwwroot
 builder.Services.AddCors(opt =>
     opt.AddPolicy("frontend", p => p
-        .WithOrigins("http://localhost:5173", "http://localhost:5174")
+        .WithOrigins(
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5174")
         .AllowAnyHeader()
         .AllowAnyMethod()
         .AllowCredentials()));

@@ -1,0 +1,7 @@
+<Project>
+  <!-- Keep bin/obj off the nearly-full C: drive so local builds don't crash the API. -->
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT' AND Exists('D:\')">
+    <BaseIntermediateOutputPath>D:\MedTer-build\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>D:\MedTer-build\out\$(MSBuildProjectName)\</BaseOutputPath>
+  </PropertyGroup>
+</Project>

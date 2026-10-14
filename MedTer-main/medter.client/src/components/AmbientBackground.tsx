@@ -7,7 +7,6 @@ const ACTIVE_MS = 4200;
 const QUIET_PREFIXES = ["/chat", "/admin", "/announcements", "/my-announcements", "/certificates", "/profile", "/centers"];
 
 function isQuietPath(pathname: string) {
-  if (pathname === "/") return false;
   return QUIET_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 

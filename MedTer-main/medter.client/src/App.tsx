@@ -12,6 +12,7 @@ import CenterDetail from "./pages/CenterDetail";
 import Certificates from "./pages/Certificates";
 import AdminDashboard from "./pages/AdminDashboard";
 import Profile from "./pages/Profile";
+import Pricing from "./pages/Pricing";
 import { type ReactNode } from "react";
 
 function Shell({ children }: { children: ReactNode }) {
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/my-announcements" element={<Shell><Protected><MyAnnouncements /></Protected></Shell>} />
         <Route path="/certificates" element={<Shell><Protected><Certificates /></Protected></Shell>} />
         <Route path="/profile" element={<Shell><Protected><Profile /></Protected></Shell>} />
+        <Route path="/pricing" element={<Shell><Pricing /></Shell>} />
         <Route path="/admin" element={<Shell><Protected><AdminDashboard /></Protected></Shell>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

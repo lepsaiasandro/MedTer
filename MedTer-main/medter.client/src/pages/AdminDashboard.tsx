@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import api from "../api";
 import { usePrefs } from "../i18n";
-import { Check, Trash, List, Users, Cap, Bell, Clock } from "../components/icons";
+import { Check, Trash, List, Users, Cap, Bell, Clock, Plus, Edit, Image } from "../components/icons";
 import MediaPlaceholder from "../components/MediaPlaceholder";
+import { partnerLogoUrl } from "../partnerLogos";
 
 interface Announcement {
   id: number;
@@ -63,13 +64,61 @@ interface ProfileChangeRequest {
   submittedAt: string;
 }
 
-type Tab = "overview" | "member-requests" | "profile-changes" | "pending-posts" | "members" | "content" | "notify" | "settings";
+interface AdBanner {
+  id: number;
+  brand: string;
+  href: string;
+  titleKa: string;
+  titleEn: string;
+  textKa: string;
+  textEn: string;
+  ctaKa: string;
+  ctaEn: string;
+  accent: string;
+  accent2: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+type AdForm = {
+  brand: string;
+  href: string;
+  titleKa: string;
+  titleEn: string;
+  textKa: string;
+  textEn: string;
+  ctaKa: string;
+  ctaEn: string;
+  accent: string;
+  accent2: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+const emptyAdForm = (): AdForm => ({
+  brand: "",
+  href: "https://",
+  titleKa: "",
+  titleEn: "",
+  textKa: "",
+  textEn: "",
+  ctaKa: "ნახვა",
+  ctaEn: "Learn more",
+  accent: "#2563eb",
+  accent2: "#1e40af",
+  sortOrder: 0,
+  isActive: true,
+});
+
+type Tab = "overview" | "member-requests" | "profile-changes" | "pending-posts" | "members" | "content" | "ads" | "notify" | "settings";
 
 export default function AdminDashboard() {
   const { t, lang } = usePrefs();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [trainings, setTrainings] = useState<Announcement[]>([]);
   const [profileChanges, setProfileChanges] = useState<ProfileChangeRequest[]>([]);
+  const [ads, setAds] = useState<AdBanner[]>([]);
   const [rejectId, setRejectId] = useState<number | null>(null);
   const [rejectKind, setRejectKind] = useState<"post" | "profile">("post");
   const [reason, setReason] = useState("");
@@ -78,6 +127,8 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>("overview");
   const [memberFilter, setMemberFilter] = useState("");
   const [contentFilter, setContentFilter] = useState<"all" | "Published" | "Pending" | "Rejected" | "Draft">("all");
+  const [contentSearch, setContentSearch] = useState("");
+  const [queueSearch, setQueueSearch] = useState("");
 
   const [notifyMode, setNotifyMode] = useState<"all" | "doctors" | "centers" | "one">("all");
   const [notifyUserId, setNotifyUserId] = useState("");
@@ -89,6 +140,13 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState({ userVerificationEnabled: true, announcementVerificationEnabled: true });
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [settingsFlash, setSettingsFlash] = useState("");
+
+  const [adForm, setAdForm] = useState<AdForm>(emptyAdForm);
+  const [editingAdId, setEditingAdId] = useState<number | null>(null);
+  const [adBusy, setAdBusy] = useState(false);
+  const [adFlash, setAdFlash] = useState("");
+  const [adError, setAdError] = useState("");
+  const [showAdForm, setShowAdForm] = useState(false);
 
   const fmtDateTime = (iso?: string) => {
     if (!iso) return "—";
@@ -129,11 +187,84 @@ export default function AdminDashboard() {
     api.get<AdminUser[]>("/admin/users").then((r) => setUsers(r.data)).catch(() => setUsers([]));
     api.get<Announcement[]>("/admin/announcements").then((r) => setTrainings(r.data)).catch(() => setTrainings([]));
     api.get<ProfileChangeRequest[]>("/admin/profile-changes").then((r) => setProfileChanges(r.data)).catch(() => setProfileChanges([]));
+    api.get<AdBanner[]>("/admin/ads").then((r) => setAds(r.data)).catch(() => setAds([]));
     api.get<{ userVerificationEnabled: boolean; announcementVerificationEnabled: boolean }>("/admin/settings")
       .then((r) => setSettings(r.data))
       .catch(() => {});
   };
   useEffect(() => { load(); }, []);
+
+  const openNewAd = () => {
+    setEditingAdId(null);
+    setAdForm({ ...emptyAdForm(), sortOrder: ads.length });
+    setAdError("");
+    setAdFlash("");
+    setShowAdForm(true);
+  };
+
+  const openEditAd = (a: AdBanner) => {
+    setEditingAdId(a.id);
+    setAdForm({
+      brand: a.brand,
+      href: a.href,
+      titleKa: a.titleKa,
+      titleEn: a.titleEn,
+      textKa: a.textKa,
+      textEn: a.textEn,
+      ctaKa: a.ctaKa,
+      ctaEn: a.ctaEn,
+      accent: a.accent,
+      accent2: a.accent2,
+      sortOrder: a.sortOrder,
+      isActive: a.isActive,
+    });
+    setAdError("");
+    setAdFlash("");
+    setShowAdForm(true);
+  };
+
+  const saveAd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdBusy(true);
+    setAdError("");
+    setAdFlash("");
+    try {
+      if (editingAdId == null) {
+        await api.post("/admin/ads", adForm);
+        setAdFlash(t("რეკლამა დაემატა", "Ad created"));
+      } else {
+        await api.put(`/admin/ads/${editingAdId}`, adForm);
+        setAdFlash(t("რეკლამა განახლდა", "Ad updated"));
+      }
+      setShowAdForm(false);
+      setEditingAdId(null);
+      setAdForm(emptyAdForm());
+      load();
+    } catch (err: any) {
+      setAdError(err?.response?.data?.message || t("შენახვა ვერ მოხერხდა", "Could not save"));
+    } finally {
+      setAdBusy(false);
+    }
+  };
+
+  const toggleAdActive = async (a: AdBanner) => {
+    try {
+      await api.put(`/admin/ads/${a.id}`, { ...a, isActive: !a.isActive });
+      load();
+    } catch {
+      setAdError(t("განახლება ვერ მოხერხდა", "Could not update"));
+    }
+  };
+
+  const deleteAd = async (id: number) => {
+    if (!confirm(t("წავშალოთ ეს რეკლამა?", "Delete this ad?"))) return;
+    try {
+      await api.delete(`/admin/ads/${id}`);
+      load();
+    } catch {
+      setAdError(t("წაშლა ვერ მოხერხდა", "Could not delete"));
+    }
+  };
 
   const toggleSetting = async (key: "userVerificationEnabled" | "announcementVerificationEnabled", value: boolean) => {
     setSettingsBusy(true);
@@ -144,10 +275,13 @@ export default function AdminDashboard() {
         { [key]: value }
       );
       setSettings(data);
+      const label = key === "userVerificationEnabled"
+        ? t("წევრობის ვერიფიკაცია", "Member verification")
+        : t("ტრენინგების ვერიფიკაცია", "Training verification");
       setSettingsFlash(
         value
-          ? t("ვერიფიკაცია ჩართულია", "Verification enabled")
-          : t("ვერიფიკაცია გამორთულია", "Verification disabled")
+          ? t(`${label} — ჩართულია`, `${label} — on`)
+          : t(`${label} — გამორთულია`, `${label} — off`)
       );
       load();
     } catch {
@@ -174,11 +308,6 @@ export default function AdminDashboard() {
   const approve = async (id: number) => { await api.post(`/announcements/${id}/approve`); load(); };
   const approveUser = async (id: string) => { await api.post(`/admin/users/${id}/approve`); load(); };
   const approveProfileChange = async (id: number) => { await api.post(`/admin/profile-changes/${id}/approve`); load(); };
-  const deleteUser = async (id: string) => {
-    if (!confirm(t("ნამდვილად გსურს ამ მომხმარებლის წაშლა?", "Delete this user?"))) return;
-    await api.delete(`/admin/users/${id}`);
-    load();
-  };
   const openUserAction = (type: "reject" | "suspend", id: string) => {
     setUserAction({ type, id });
     setUserReason("");
@@ -276,15 +405,34 @@ export default function AdminDashboard() {
     );
   };
 
-  const filteredMembers = users.filter((u) => {
-    const q = memberFilter.trim().toLowerCase();
-    if (!q) return true;
-    return [u.displayName, u.email, u.city, u.specialty, u.phone, u.role]
-      .filter(Boolean)
-      .some((v) => String(v).toLowerCase().includes(q));
-  });
+  const matchesQuery = (q: string, values: Array<string | number | undefined | null>) => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return true;
+    return values
+      .filter((v) => v !== undefined && v !== null && String(v).trim() !== "")
+      .some((v) => String(v).toLowerCase().includes(needle));
+  };
 
-  const filteredContent = trainings.filter((a) => contentFilter === "all" || a.status === contentFilter);
+  const filteredMembers = users.filter((u) =>
+    matchesQuery(memberFilter, [u.displayName, u.email, u.city, u.specialty, u.phone, u.role, userStatus(u)])
+  );
+
+  const filteredPendingUsers = pendingUsers.filter((u) =>
+    matchesQuery(queueSearch, [u.displayName, u.email, u.city, u.specialty, u.phone, u.role])
+  );
+
+  const filteredProfileChanges = profileChanges.filter((r) =>
+    matchesQuery(queueSearch, [r.displayName, r.email, r.role, r.proposedSpecialty, r.proposedCenterName, r.proposedCity])
+  );
+
+  const filteredPendingTrainings = pendingTrainings.filter((a) =>
+    matchesQuery(queueSearch, [a.title, a.centerName, a.category, a.type, a.city, a.format])
+  );
+
+  const filteredContent = trainings.filter((a) => {
+    if (contentFilter !== "all" && a.status !== contentFilter) return false;
+    return matchesQuery(contentSearch, [a.title, a.centerName, a.category, a.type, a.city, a.format, a.shortDescription]);
+  });
 
   const nav: { id: Tab; label: string; count?: number; icon: ReactNode }[] = [
     { id: "overview", label: t("მიმოხილვა", "Overview"), icon: <List size={17} /> },
@@ -293,6 +441,7 @@ export default function AdminDashboard() {
     { id: "pending-posts", label: t("პოსტების დამტკიცება", "Post approvals"), count: pendingTrainings.length, icon: <Cap size={17} /> },
     { id: "members", label: t("წევრები", "Members"), count: users.length, icon: <Users size={17} /> },
     { id: "content", label: t("კონტენტი", "Content"), count: trainings.length, icon: <List size={17} /> },
+    { id: "ads", label: t("რეკლამები", "Ads"), count: ads.length, icon: <Image size={17} /> },
     { id: "notify", label: t("შეტყობინება", "Notify"), icon: <Bell size={17} /> },
     { id: "settings", label: t("ვერიფიკაცია", "Verification"), icon: <Check size={17} /> },
   ];
@@ -470,10 +619,18 @@ export default function AdminDashboard() {
               key={item.id}
               type="button"
               className={`admin-nav-item ${tab === item.id ? "active" : ""}`}
-              onClick={() => setTab(item.id)}
+              onClick={() => {
+                setTab(item.id);
+                setQueueSearch("");
+              }}
             >
               <span className="ic">{item.icon}</span>
               <span className="lbl">{item.label}</span>
+              {item.id === "settings" && (
+                <span className={`cnt ${(settings.userVerificationEnabled || settings.announcementVerificationEnabled) ? "hot" : ""}`}>
+                  {[settings.userVerificationEnabled, settings.announcementVerificationEnabled].filter(Boolean).length}/2
+                </span>
+              )}
               {typeof item.count === "number" && item.count > 0 && (
                 <span className={`cnt ${item.id.includes("pending") || item.id.includes("request") || item.id.includes("profile") ? "hot" : ""}`}>{item.count}</span>
               )}
@@ -504,6 +661,11 @@ export default function AdminDashboard() {
                   <span className="v">{pendingTrainings.length}</span>
                   <span className="s">{t("ტრენინგების დამტკიცება", "Approve trainings")}</span>
                 </button>
+                <button type="button" className="admin-kpi-card" onClick={() => setTab("ads")}>
+                  <span className="k">{t("რეკლამები", "Ads")}</span>
+                  <span className="v">{ads.length}</span>
+                  <span className="s">{t("ბანერების მართვა", "Manage banners")} · {ads.filter((a) => a.isActive).length} {t("აქტიური", "active")}</span>
+                </button>
                 <button type="button" className="admin-kpi-card" onClick={() => setTab("members")}>
                   <span className="k">{t("სულ წევრები", "Total members")}</span>
                   <span className="v">{users.length}</span>
@@ -529,37 +691,67 @@ export default function AdminDashboard() {
 
           {tab === "member-requests" && (
             <>
-              <div className="admin-section-head">
-                <h2>{t("წევრობის მოთხოვნები", "Member requests")}</h2>
-                <p>{t("ადამიანები, რომლებიც ითხოვენ MedTer-ზე გაწევრიანებას", "People who asked to join MedTer")}</p>
+              <div className="admin-section-head row">
+                <div>
+                  <h2>{t("წევრობის მოთხოვნები", "Member requests")}</h2>
+                  <p>{t("ადამიანები, რომლებიც ითხოვენ MedTer-ზე გაწევრიანებას", "People who asked to join MedTer")}</p>
+                </div>
+                <input
+                  className="control admin-search"
+                  value={queueSearch}
+                  onChange={(e) => setQueueSearch(e.target.value)}
+                  placeholder={t("ძიება სახელით, ელფოსტით…", "Search by name, email…")}
+                />
               </div>
               {pendingUsers.length === 0
                 ? empty(t("მოთხოვნები არ არის", "No requests"), t("ახალი რეგისტრაციები აქ გამოჩნდება.", "New registrations will appear here."), <Users size={42} />)
-                : <div className="admin-queue">{pendingUsers.map(memberRequestCard)}</div>}
+                : filteredPendingUsers.length === 0
+                  ? empty(t("შედეგი არ მოიძებნა", "No matches"), t("შეცვალე ძიების ტექსტი.", "Try a different search."), <Users size={42} />)
+                  : <div className="admin-queue">{filteredPendingUsers.map(memberRequestCard)}</div>}
             </>
           )}
 
           {tab === "profile-changes" && (
             <>
-              <div className="admin-section-head">
-                <h2>{t("პროფილის ცვლილებები", "Profile changes")}</h2>
-                <p>{t("მომხმარებლების მიერ მოთხოვნილი ინფორმაციის განახლებები", "User-requested profile information updates")}</p>
+              <div className="admin-section-head row">
+                <div>
+                  <h2>{t("პროფილის ცვლილებები", "Profile changes")}</h2>
+                  <p>{t("მომხმარებლების მიერ მოთხოვნილი ინფორმაციის განახლებები", "User-requested profile information updates")}</p>
+                </div>
+                <input
+                  className="control admin-search"
+                  value={queueSearch}
+                  onChange={(e) => setQueueSearch(e.target.value)}
+                  placeholder={t("ძიება სახელით, ელფოსტით…", "Search by name, email…")}
+                />
               </div>
               {profileChanges.length === 0
                 ? empty(t("ცვლილებები არ არის", "No changes"), t("პროფილის განახლებები აქ გამოჩნდება.", "Profile updates will appear here."), <Users size={42} />)
-                : <div className="admin-queue">{profileChanges.map(profileChangeCard)}</div>}
+                : filteredProfileChanges.length === 0
+                  ? empty(t("შედეგი არ მოიძებნა", "No matches"), t("შეცვალე ძიების ტექსტი.", "Try a different search."), <Users size={42} />)
+                  : <div className="admin-queue">{filteredProfileChanges.map(profileChangeCard)}</div>}
             </>
           )}
 
           {tab === "pending-posts" && (
             <>
-              <div className="admin-section-head">
-                <h2>{t("პოსტების დამტკიცება", "Post approvals")}</h2>
-                <p>{t("ტრენინგ ცენტრების განცხადებები, რომლებიც ელოდება გამოქვეყნებას", "Training center posts waiting to go live")}</p>
+              <div className="admin-section-head row">
+                <div>
+                  <h2>{t("პოსტების დამტკიცება", "Post approvals")}</h2>
+                  <p>{t("ტრენინგ ცენტრების განცხადებები, რომლებიც ელოდება გამოქვეყნებას", "Training center posts waiting to go live")}</p>
+                </div>
+                <input
+                  className="control admin-search"
+                  value={queueSearch}
+                  onChange={(e) => setQueueSearch(e.target.value)}
+                  placeholder={t("ძიება სათაურით, ცენტრით…", "Search by title, center…")}
+                />
               </div>
               {pendingTrainings.length === 0
                 ? empty(t("ყველაფერი განხილულია", "All reviewed"), t("დასამტკიცებელი ტრენინგი არ არის.", "No trainings waiting for approval."), <Check size={42} />)
-                : <div className="admin-queue">{pendingTrainings.map((a) => postApprovalCard(a))}</div>}
+                : filteredPendingTrainings.length === 0
+                  ? empty(t("შედეგი არ მოიძებნა", "No matches"), t("შეცვალე ძიების ტექსტი.", "Try a different search."), <Cap size={42} />)
+                  : <div className="admin-queue">{filteredPendingTrainings.map((a) => postApprovalCard(a))}</div>}
             </>
           )}
 
@@ -635,9 +827,6 @@ export default function AdminDashboard() {
                                   {t("შეჩერება", "Suspend")}
                                 </button>
                               )}
-                              <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => deleteUser(u.id)}>
-                                <Trash size={14} />
-                              </button>
                             </td>
                           </tr>
                           );
@@ -656,17 +845,219 @@ export default function AdminDashboard() {
                   <h2>{t("კონტენტი", "Content")}</h2>
                   <p>{t("ყველა ტრენინგი — სტატუსი, თარიღი და დრო", "All trainings — status, date and time")}</p>
                 </div>
-                <div className="role-toggle admin-filter-toggle">
-                  {(["all", "Pending", "Published", "Rejected", "Draft"] as const).map((f) => (
-                    <button key={f} type="button" className={contentFilter === f ? "active" : ""} onClick={() => setContentFilter(f)}>
-                      {f === "all" ? t("ყველა", "All") : statusLabel(f)}
-                    </button>
-                  ))}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "flex-end" }}>
+                  <input
+                    className="control admin-search"
+                    value={contentSearch}
+                    onChange={(e) => setContentSearch(e.target.value)}
+                    placeholder={t("ძიება სათაურით, ცენტრით…", "Search by title, center…")}
+                  />
+                  <div className="role-toggle admin-filter-toggle">
+                    {(["all", "Pending", "Published", "Rejected", "Draft"] as const).map((f) => (
+                      <button key={f} type="button" className={contentFilter === f ? "active" : ""} onClick={() => setContentFilter(f)}>
+                        {f === "all" ? t("ყველა", "All") : statusLabel(f)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-              {filteredContent.length === 0
+              {trainings.length === 0
                 ? empty(t("კონტენტი არ არის", "No content"), t("ტრენინგები აქ გამოჩნდება.", "Trainings will appear here."), <Cap size={42} />)
-                : <div className="admin-queue">{filteredContent.map((a) => postApprovalCard(a))}</div>}
+                : filteredContent.length === 0
+                  ? empty(t("შედეგი არ მოიძებნა", "No matches"), t("შეცვალე ძიება ან ფილტრი.", "Try another search or filter."), <Cap size={42} />)
+                  : <div className="admin-queue">{filteredContent.map((a) => postApprovalCard(a))}</div>}
+            </>
+          )}
+
+          {tab === "ads" && (
+            <>
+              <div className="admin-section-head" style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start", justifyContent: "space-between" }}>
+                <div>
+                  <h2>{t("რეკლამების მართვა", "Ad management")}</h2>
+                  <p>{t("ბანერები ჰედერის ქვემოთ — PSP, Aversi და სხვა პარტნიორები", "Banners under the header — PSP, Aversi and other partners")}</p>
+                </div>
+                <button type="button" className="btn btn-primary btn-sm" onClick={openNewAd}>
+                  <Plus size={15} /> {t("ახალი რეკლამა", "New ad")}
+                </button>
+              </div>
+
+              {adFlash && <div className="admin-success" style={{ marginBottom: 12 }}>{adFlash}</div>}
+              {adError && <div className="auth-error" style={{ marginBottom: 12 }}>{adError}</div>}
+
+              {showAdForm && (
+                <form className="card" style={{ padding: 18, marginBottom: 16 }} onSubmit={saveAd}>
+                  <div className="admin-section-head" style={{ marginBottom: 12 }}>
+                    <h2 style={{ fontSize: 17 }}>
+                      {editingAdId == null ? t("ახალი ბანერი", "New banner") : t("ბანერის რედაქტირება", "Edit banner")}
+                    </h2>
+                  </div>
+                  <div className="field-grid">
+                    <div className="field">
+                      <label>{t("ბრენდი", "Brand")} <span className="req">*</span></label>
+                      <input className="control" value={adForm.brand} onChange={(e) => setAdForm({ ...adForm, brand: e.target.value })} placeholder="PSP" required />
+                    </div>
+                    <div className="field">
+                      <label>{t("ბმული", "Link")} <span className="req">*</span></label>
+                      <input className="control" value={adForm.href} onChange={(e) => setAdForm({ ...adForm, href: e.target.value })} placeholder="https://psp.ge/" required />
+                    </div>
+                    <div className="field">
+                      <label>{t("სათაური (ქართ)", "Title (KA)")}</label>
+                      <input className="control" value={adForm.titleKa} onChange={(e) => setAdForm({ ...adForm, titleKa: e.target.value })} />
+                    </div>
+                    <div className="field">
+                      <label>{t("სათაური (ინგლ)", "Title (EN)")}</label>
+                      <input className="control" value={adForm.titleEn} onChange={(e) => setAdForm({ ...adForm, titleEn: e.target.value })} />
+                    </div>
+                    <div className="field">
+                      <label>{t("ტექსტი (ქართ)", "Text (KA)")}</label>
+                      <input className="control" value={adForm.textKa} onChange={(e) => setAdForm({ ...adForm, textKa: e.target.value })} />
+                    </div>
+                    <div className="field">
+                      <label>{t("ტექსტი (ინგლ)", "Text (EN)")}</label>
+                      <input className="control" value={adForm.textEn} onChange={(e) => setAdForm({ ...adForm, textEn: e.target.value })} />
+                    </div>
+                    <div className="field">
+                      <label>{t("ღილაკი (ქართ)", "CTA (KA)")}</label>
+                      <input className="control" value={adForm.ctaKa} onChange={(e) => setAdForm({ ...adForm, ctaKa: e.target.value })} />
+                    </div>
+                    <div className="field">
+                      <label>{t("ღილაკი (ინგლ)", "CTA (EN)")}</label>
+                      <input className="control" value={adForm.ctaEn} onChange={(e) => setAdForm({ ...adForm, ctaEn: e.target.value })} />
+                    </div>
+                    <div className="field">
+                      <label>{t("ფერი 1", "Color 1")}</label>
+                      <input className="control" type="color" value={adForm.accent} onChange={(e) => setAdForm({ ...adForm, accent: e.target.value })} />
+                    </div>
+                    <div className="field">
+                      <label>{t("ფერი 2", "Color 2")}</label>
+                      <input className="control" type="color" value={adForm.accent2} onChange={(e) => setAdForm({ ...adForm, accent2: e.target.value })} />
+                    </div>
+                    <div className="field">
+                      <label>{t("რიგი", "Order")}</label>
+                      <input className="control" type="number" value={adForm.sortOrder} onChange={(e) => setAdForm({ ...adForm, sortOrder: Number(e.target.value) || 0 })} />
+                    </div>
+                    <div className="field">
+                      <label>{t("სტატუსი", "Status")}</label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, cursor: "pointer", fontWeight: 600 }}>
+                        <input
+                          type="checkbox"
+                          checked={adForm.isActive}
+                          onChange={(e) => setAdForm({ ...adForm, isActive: e.target.checked })}
+                        />
+                        {adForm.isActive ? t("აქტიური", "Active") : t("გამორთული", "Off")}
+                      </label>
+                    </div>
+                  </div>
+                  <div
+                    className="partner-strip-card"
+                    style={{
+                      marginTop: 14,
+                      background: `linear-gradient(105deg, ${adForm.accent} 0%, ${adForm.accent2} 100%)`,
+                      minHeight: 88,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {(() => {
+                      const previewLogo = partnerLogoUrl(adForm.brand);
+                      return (
+                        <div className={`partner-strip-mark${previewLogo ? " has-logo" : ""}`}>
+                          {previewLogo ? (
+                            <img src={previewLogo} alt="" className="partner-strip-logo" />
+                          ) : (
+                            adForm.brand || "Brand"
+                          )}
+                        </div>
+                      );
+                    })()}
+                    <div className="partner-strip-copy">
+                      <strong>{adForm.titleKa || adForm.titleEn || t("სათაური", "Title")}</strong>
+                      <span>{adForm.textKa || adForm.textEn || t("ტექსტი", "Text")}</span>
+                    </div>
+                    <span className="partner-strip-cta">{adForm.ctaKa || adForm.ctaEn || "CTA"}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+                    <button className="btn btn-primary" type="submit" disabled={adBusy}>
+                      {adBusy ? "..." : editingAdId == null ? t("დამატება", "Add") : t("შენახვა", "Save")}
+                    </button>
+                    <button
+                      className="btn btn-text"
+                      type="button"
+                      onClick={() => { setShowAdForm(false); setEditingAdId(null); setAdError(""); }}
+                    >
+                      {t("გაუქმება", "Cancel")}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {ads.length === 0
+                ? empty(
+                    t("რეკლამები არ არის", "No ads yet"),
+                    t("დაამატე პირველი ბანერი — გამოჩნდება ყველა გვერდზე.", "Add the first banner — it will show on every page."),
+                    <Image size={42} />
+                  )
+                : (
+                  <div className="admin-queue">
+                    {ads.map((a) => {
+                      const logo = partnerLogoUrl(a.brand);
+                      return (
+                      <article className="admin-queue-card" key={a.id}>
+                        <div
+                          className={`partner-strip-mark${logo ? " has-logo" : ""}`}
+                          style={{
+                            width: 72,
+                            minHeight: 64,
+                            borderRadius: 12,
+                            background: logo
+                              ? "#fff"
+                              : `linear-gradient(135deg, ${a.accent}, ${a.accent2})`,
+                            flex: "none",
+                            padding: logo ? 6 : undefined,
+                          }}
+                          aria-hidden
+                        >
+                          {logo ? (
+                            <img src={logo} alt="" className="partner-strip-logo" style={{ maxWidth: 56, maxHeight: 48 }} />
+                          ) : (
+                            a.brand
+                          )}
+                        </div>
+                        <div className="admin-queue-main">
+                          <div className="admin-queue-top">
+                            <div>
+                              <div className="admin-queue-title">{a.brand} — {a.titleKa || a.titleEn}</div>
+                              <div className="admin-queue-sub">{a.href}</div>
+                            </div>
+                            <span className={`admin-badge ${a.isActive ? "ok" : "muted"}`}>
+                              {a.isActive ? t("აქტიური", "Active") : t("გამორთული", "Off")}
+                            </span>
+                          </div>
+                          <div className="admin-meta-grid">
+                            <div><span>{t("რიგი", "Order")}</span><b>{a.sortOrder}</b></div>
+                            <div><span>{t("ტექსტი", "Text")}</span><b>{a.textKa || a.textEn || "—"}</b></div>
+                          </div>
+                          <div className="admin-queue-actions">
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => openEditAd(a)}>
+                              <Edit size={14} /> {t("რედაქტირება", "Edit")}
+                            </button>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void toggleAdActive(a)}>
+                              {a.isActive ? t("გამორთვა", "Disable") : t("ჩართვა", "Enable")}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              style={{ color: "var(--danger)", borderColor: "#f3c9c9" }}
+                              onClick={() => void deleteAd(a.id)}
+                            >
+                              <Trash size={14} /> {t("წაშლა", "Delete")}
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                      );
+                    })}
+                  </div>
+                )}
             </>
           )}
 
@@ -738,6 +1129,36 @@ export default function AdminDashboard() {
                 <h2>{t("ვერიფიკაციის სისტემა", "Verification system")}</h2>
                 <p>{t("ჩართე ან გამორთე რეგისტრაციისა და ტრენინგების დამტკიცება", "Turn registration and training approval on or off")}</p>
               </div>
+
+              <div className="admin-kpi" style={{ marginBottom: 16 }}>
+                <div className="admin-kpi-card" style={{ cursor: "default" }}>
+                  <span className="k">{t("წევრობის ვერიფიკაცია", "Member verification")}</span>
+                  <span className="v" style={{ fontSize: 22 }}>
+                    <span className={`admin-badge ${settings.userVerificationEnabled ? "ok" : "muted"}`}>
+                      {settings.userVerificationEnabled ? t("ჩართულია", "On") : t("გამორთულია", "Off")}
+                    </span>
+                  </span>
+                  <span className="s">
+                    {settings.userVerificationEnabled
+                      ? t("ახალი რეგისტრაციები ელოდება ადმინს", "New sign-ups wait for admin")
+                      : t("რეგისტრაცია ავტომატურად აქტიურდება", "Sign-ups activate automatically")}
+                  </span>
+                </div>
+                <div className="admin-kpi-card" style={{ cursor: "default" }}>
+                  <span className="k">{t("ტრენინგების ვერიფიკაცია", "Training verification")}</span>
+                  <span className="v" style={{ fontSize: 22 }}>
+                    <span className={`admin-badge ${settings.announcementVerificationEnabled ? "ok" : "muted"}`}>
+                      {settings.announcementVerificationEnabled ? t("ჩართულია", "On") : t("გამორთულია", "Off")}
+                    </span>
+                  </span>
+                  <span className="s">
+                    {settings.announcementVerificationEnabled
+                      ? t("ტრენინგები ელოდება ადმინს", "Trainings wait for admin")
+                      : t("ტრენინგები მაშინვე ქვეყნდება", "Trainings publish immediately")}
+                  </span>
+                </div>
+              </div>
+
               <div className="admin-queue" style={{ gap: 14 }}>
                 <article className="admin-queue-card">
                   <div className="admin-queue-main" style={{ width: "100%" }}>
@@ -752,7 +1173,9 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       <span className={`admin-badge ${settings.userVerificationEnabled ? "ok" : "muted"}`}>
-                        {settings.userVerificationEnabled ? t("ჩართულია", "On") : t("გამორთულია", "Off")}
+                        {settings.userVerificationEnabled
+                          ? t("ამჟამად ჩართულია", "Currently on")
+                          : t("ამჟამად გამორთულია", "Currently off")}
                       </span>
                     </div>
                     <div className="admin-queue-actions">
@@ -794,7 +1217,9 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       <span className={`admin-badge ${settings.announcementVerificationEnabled ? "ok" : "muted"}`}>
-                        {settings.announcementVerificationEnabled ? t("ჩართულია", "On") : t("გამორთულია", "Off")}
+                        {settings.announcementVerificationEnabled
+                          ? t("ამჟამად ჩართულია", "Currently on")
+                          : t("ამჟამად გამორთულია", "Currently off")}
                       </span>
                     </div>
                     <div className="admin-queue-actions">

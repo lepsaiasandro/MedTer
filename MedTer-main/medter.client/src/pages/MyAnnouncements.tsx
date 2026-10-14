@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../api";
 import ShareMenu from "../components/ShareMenu";
 import { usePrefs } from "../i18n";
+import { Check, X } from "../components/icons";
 
 /* ── types ──────────────────────────────────────────────────────────── */
 interface Announcement {
@@ -138,6 +139,7 @@ const IcPlus = (
 /* ════════════════════════════════════════════════════════════════════ */
 export default function MyAnnouncements() {
   const { t, lang } = usePrefs();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [items, setItems] = useState<Announcement[]>([]);
   const [view, setView] = useState<"list" | "form">("list");
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -150,43 +152,28 @@ export default function MyAnnouncements() {
   const [interested, setInterested] = useState<InterestedDoctor[]>([]);
   const [notify, setNotify] = useState({ subject: "", message: "" });
   const [flash, setFlash] = useState("");
+  const [welcome, setWelcome] = useState(false);
   const [drag, setDrag] = useState(false);
   const [certBusy, setCertBusy] = useState<string | null>(null);  // doctorUserId being uploaded
   const [certDone, setCertDone] = useState<string | null>(null);  // recently succeeded (green flash)
 
-  const [verificationOn, setVerificationOn] = useState(true);
-  const [globalVerificationOn, setGlobalVerificationOn] = useState(true);
-  const [verBusy, setVerBusy] = useState(false);
+  const [subActive, setSubActive] = useState<boolean | null>(null);
 
   const load = () => api.get<Announcement[]>("/announcements/mine").then((r) => setItems(r.data));
-  const loadVerification = () =>
-    api.get<{ announcementVerificationEnabled: boolean; globalAnnouncementVerificationEnabled: boolean }>(
-      "/users/me/verification-settings"
-    ).then((r) => {
-      setVerificationOn(r.data.announcementVerificationEnabled);
-      setGlobalVerificationOn(r.data.globalAnnouncementVerificationEnabled);
-    }).catch(() => {});
+  const loadBilling = () =>
+    api.get<{ isActive: boolean }>("/billing/status")
+      .then((r) => setSubActive(r.data.isActive))
+      .catch(() => setSubActive(null));
 
-  useEffect(() => { load(); loadVerification(); }, []);
+  useEffect(() => { load(); loadBilling(); }, []);
 
-  const toggleVerification = async (enabled: boolean) => {
-    if (!enabled && !confirm(t(
-      "ვერიფიკაციის გამორთვისას თქვენი ტრენინგები ადმინის გარეშე გამოქვეყნდება. გაგრძელება?",
-      "Disabling verification publishes your trainings without admin review. Continue?"
-    ))) return;
-    setVerBusy(true);
-    try {
-      const { data } = await api.put<{ announcementVerificationEnabled: boolean; globalAnnouncementVerificationEnabled: boolean }>(
-        "/users/me/verification-settings",
-        { announcementVerificationEnabled: enabled }
-      );
-      setVerificationOn(data.announcementVerificationEnabled);
-      setGlobalVerificationOn(data.globalAnnouncementVerificationEnabled);
-      await load();
-    } finally {
-      setVerBusy(false);
-    }
-  };
+  useEffect(() => {
+    if (searchParams.get("welcome") !== "1") return;
+    setWelcome(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("welcome");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const createGroupChat = async (announcementId: number) => {
     try {
@@ -259,11 +246,25 @@ export default function MyAnnouncements() {
       registrationDeadline: form.registrationDeadline ? new Date(form.registrationDeadline).toISOString() : null,
       status,
     };
-    if (form.id) await api.put(`/announcements/${form.id}`, body);
-    else await api.post("/announcements", body);
-    setView("list");
-    setForm(emptyForm);
-    load();
+    try {
+      if (form.id) await api.put(`/announcements/${form.id}`, body);
+      else await api.post("/announcements", body);
+      setView("list");
+      setForm(emptyForm);
+      load();
+    } catch (e: unknown) {
+      const data = (e as { response?: { status?: number; data?: { message?: string; code?: string } } })?.response;
+      if (data?.status === 402 || data?.data?.code === "subscription_required") {
+        const go = confirm(
+          (data.data?.message || t("გამოქვეყნებისთვის საჭიროა Center Pro.", "Center Pro is required to publish."))
+          + "\n\n"
+          + t("გახსნა Pricing გვერდი?", "Open the Pricing page?")
+        );
+        if (go) window.location.href = "/pricing";
+        return;
+      }
+      alert(data?.data?.message || t("შენახვა ვერ მოხერხდა", "Save failed"));
+    }
   };
 
   const remove = async (id: number) => {
@@ -540,10 +541,36 @@ export default function MyAnnouncements() {
     );
   }
 
+  const welcomeBanner = welcome ? (
+    <div className="train-flash train-flash--ok" role="status" style={{ marginBottom: 16 }}>
+      <div className="train-flash-icon"><Check size={16} /></div>
+      <div className="train-flash-body">
+        <p>{t("კეთილი იყოს თქვენი მობრძანება! ახლა შეგიძლიათ ტრენინგის განცხადების შექმნა.", "Welcome! You can create your first training announcement now.")}</p>
+      </div>
+      <button type="button" className="act" aria-label="Close" onClick={() => setWelcome(false)}>
+        <X size={16} />
+      </button>
+    </div>
+  ) : null;
+
   /* ════════════════ EMPTY STATE ════════════════ */
   if (items.length === 0) {
     return (
       <div>
+        {welcomeBanner}
+        {subActive === false && (
+          <div style={{
+            margin: "0 0 16px", padding: "12px 14px", borderRadius: 12,
+            border: "1px solid var(--border)", background: "var(--teal-soft)",
+            display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between",
+            fontSize: 14, color: "var(--text)",
+          }}>
+            <span>{t("გამოქვეყნებისთვის საჭიროა Center Pro. Draft უფასოა.", "Center Pro is required to publish. Drafts are free.")}</span>
+            <Link to="/pricing" className="btn btn-primary" style={{ textDecoration: "none" }}>
+              {t("გამოწერა", "Pricing")}
+            </Link>
+          </div>
+        )}
         <div className="page-head">
           <div className="h-text">
             <h1>{t("ჩემი განცხადებები", "My Announcements")}</h1>
@@ -562,9 +589,25 @@ export default function MyAnnouncements() {
     );
   }
 
+  const subBanner = subActive === false ? (
+    <div style={{
+      margin: "0 0 16px", padding: "12px 14px", borderRadius: 12,
+      border: "1px solid var(--border)", background: "var(--teal-soft)",
+      display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between",
+      fontSize: 14, color: "var(--text)",
+    }}>
+      <span>{t("გამოქვეყნებისთვის საჭიროა Center Pro. Draft უფასოა.", "Center Pro is required to publish. Drafts are free.")}</span>
+      <Link to="/pricing" className="btn btn-primary" style={{ textDecoration: "none" }}>
+        {t("გამოწერა", "Pricing")}
+      </Link>
+    </div>
+  ) : null;
+
   /* ════════════════ LIST VIEW ════════════════ */
   return (
     <div>
+      {welcomeBanner}
+      {subBanner}
       <div className="page-head">
         <div className="h-text">
           <h1>{t("ჩემი განცხადებები", "My Announcements")}</h1>
@@ -572,36 +615,6 @@ export default function MyAnnouncements() {
         </div>
         <div className="spacer" />
         <button className="btn btn-primary btn-lg" onClick={openCreate}>{IcPlus} {t("ახალი განცხადება", "New announcement")}</button>
-      </div>
-
-      <div className="card" style={{ padding: "16px 18px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 14.5, color: "var(--text)" }}>
-            {t("ტრენინგების ვერიფიკაცია", "Training verification")}
-          </div>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--muted)", lineHeight: 1.45 }}>
-            {!globalVerificationOn
-              ? t("ადმინმა გლობალურად გამორთო ტრენინგების ვერიფიკაცია — ყველა ტრენინგი მაშინვე ქვეყნდება.", "Admin disabled training verification globally — all trainings publish immediately.")
-              : verificationOn
-                ? t("ჩართულია: გამოქვეყნება ადმინის დამტკიცებას ელოდება (შეუძლია უარყოფაც).", "On: publishing waits for admin approval (admin can also reject).")
-                : t("გამორთულია: თქვენი ტრენინგები ადმინის გარეშე გამოქვეყნდება.", "Off: your trainings publish without admin review.")}
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
-          <span className={`status ${verificationOn && globalVerificationOn ? "pending" : "pub"}`} style={{ position: "static" }}>
-            {verificationOn && globalVerificationOn ? t("ჩართულია", "On") : t("გამორთულია", "Off")}
-          </span>
-          <button
-            className="btn btn-ghost btn-sm"
-            disabled={verBusy || !globalVerificationOn}
-            onClick={() => void toggleVerification(!verificationOn)}
-            title={!globalVerificationOn ? t("გლობალურად გამორთულია ადმინის მიერ", "Globally disabled by admin") : undefined}
-          >
-            {verificationOn
-              ? t("გამორთვა", "Disable")
-              : t("ჩართვა", "Enable")}
-          </button>
-        </div>
       </div>
 
       {/* stat strip */}

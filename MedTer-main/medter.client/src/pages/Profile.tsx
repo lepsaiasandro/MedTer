@@ -558,9 +558,12 @@ export default function Profile() {
                   : <>{t("საჭიროა კიდევ", "You need")} <b style={{ color: "var(--text)" }}>{GOAL - points} {t("ქულა", "points")}</b> {t("წლიურ მიზნამდე", "to reach the goal")}</>}
               </p>
               {profile.interestsCount > 0 && (
-                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border)", fontSize: 13.5, color: "var(--muted)", display: "flex", alignItems: "center", gap: 8 }}>
-                  <Users size={16} /> {t("ინტერესი გამოთქმულია", "Interests marked")}: <b style={{ color: "var(--text)" }}>{profile.interestsCount}</b>
-                </div>
+                <Link
+                  to="/announcements?mine=1"
+                  style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border)", fontSize: 13.5, color: "var(--muted)", display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}
+                >
+                  <Users size={16} /> {t("ჩემი ტრენინგები", "My trainings")}: <b style={{ color: "var(--text)" }}>{profile.interestsCount}</b>
+                </Link>
               )}
             </div>
           )}

@@ -72,6 +72,34 @@ public class AnnouncementsController : ControllerBase
         return Ok(list);
     }
 
+    // Doctor: trainings they registered for (marked interest)
+    [HttpGet("my-registrations")]
+    public async Task<IActionResult> GetMyRegistrations()
+    {
+        if (IsCenter || IsAdmin) return Forbid();
+        var myId = MyId;
+
+        var list = await _db.Interests
+            .Where(i => i.DoctorUserId == myId && i.Announcement != null && i.Announcement.Status == "Published")
+            .OrderBy(i => i.Announcement!.StartDate ?? DateTime.MaxValue)
+            .Select(i => new AnnouncementDto(
+                i.Announcement!.Id, i.Announcement.Title, i.Announcement.Type, i.Announcement.Category,
+                i.Announcement.Format, i.Announcement.ShortDescription, i.Announcement.Description,
+                i.Announcement.City, i.Announcement.Duration, i.Announcement.Language,
+                i.Announcement.Points, i.Announcement.Price, i.Announcement.Seats, i.Announcement.ImageUrl,
+                i.Announcement.StartDate, i.Announcement.RegistrationDeadline,
+                i.Announcement.Status, i.Announcement.RejectionReason,
+                i.Announcement.CenterUserId, i.Announcement.Center!.DisplayName,
+                i.Announcement.Interests.Count,
+                true,
+                _db.Favorites.Any(f => f.AnnouncementId == i.AnnouncementId && f.DoctorUserId == myId),
+                i.Announcement.CreatedAt,
+                _db.ChatGroups.Any(g => g.AnnouncementId == i.AnnouncementId)))
+            .ToListAsync();
+
+        return Ok(list);
+    }
+
     // Admin: announcements waiting for approval
     [HttpGet("pending")]
     public async Task<IActionResult> GetPending()
@@ -135,6 +163,9 @@ public class AnnouncementsController : ControllerBase
     {
         if (!IsCenter) return Forbid();
 
+        var subBlock = await RequireCenterProForPublishAsync(dto.Status);
+        if (subBlock is not null) return subBlock;
+
         var a = new Announcement { CenterUserId = MyId };
         await ApplyAsync(a, dto);
         _db.Announcements.Add(a);
@@ -149,9 +180,30 @@ public class AnnouncementsController : ControllerBase
         if (a is null) return NotFound();
         if (a.CenterUserId != MyId) return Forbid();
 
+        var subBlock = await RequireCenterProForPublishAsync(dto.Status);
+        if (subBlock is not null) return subBlock;
+
         await ApplyAsync(a, dto);
         await _db.SaveChangesAsync();
         return Ok();
+    }
+
+    /// <summary>Drafts are free; publishing (Pending/Published) requires active Center Pro.</summary>
+    private async Task<IActionResult?> RequireCenterProForPublishAsync(string? requestedStatus)
+    {
+        if (string.Equals(requestedStatus, "Draft", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var center = await _db.Users.FindAsync(MyId);
+        if (center is null) return Unauthorized();
+        if (center.HasActiveCenterSubscription) return null;
+
+        return StatusCode(StatusCodes.Status402PaymentRequired, new
+        {
+            message = "Center Pro subscription required to publish trainings. You can still save drafts.",
+            code = "subscription_required",
+            pricingPath = "/pricing"
+        });
     }
 
     // Copy incoming fields onto the entity (shared by Create + Update)

@@ -117,7 +117,16 @@ export default function Dashboard() {
             <article
               key={c.userId}
               className="card card-interactive reveal"
-              style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+              style={{ animationDelay: `${Math.min(i, 8) * 40}ms`, cursor: "pointer" }}
+              role="link"
+              tabIndex={0}
+              onClick={() => navigate(`/centers/${c.userId}`)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  navigate(`/centers/${c.userId}`);
+                }
+              }}
             >
               <div className="media">
                 <MediaPlaceholder title={c.name} subtitle={c.city} variant={i % 2 === 0 ? "brand" : "teal"} />
@@ -130,13 +139,6 @@ export default function Dashboard() {
                 <h3>{c.name}</h3>
                 <StarsView value={c.averageRating} count={c.ratingCount} />
                 {c.description && <p className="desc" style={{ flex: 1 }}>{c.description}</p>}
-                {user && (
-                  <div style={{ marginTop: "auto", paddingTop: 4 }}>
-                    <button className="btn btn-ghost btn-sm btn-block" onClick={() => navigate(`/centers/${c.userId}`)}>
-                      {t("დეტალურად", "Details")}
-                    </button>
-                  </div>
-                )}
               </div>
             </article>
           ))}

@@ -3,7 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
 import api from "../api";
-import { Bell, Chat, ChevronDown, Home, Cap, Check, Sun, Moon, Users, Menu, X } from "./icons";
+import { Bell, Chat, ChevronDown, Home, Cap, Sun, Moon, Users, Menu, X } from "./icons";
+import LinearAdBanner from "./LinearAdBanner";
 import logoIcon from "../assets/medter-icon.png";
 
 interface Notif { id: number; text: string; isRead: boolean; createdAt: string; }
@@ -32,7 +33,10 @@ export default function Layout({ children }: { children: ReactNode }) {
           { to: "/", label: t("მთავარი", "Home") },
           { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers") },
           { to: "/announcements", label: t("ტრენინგები", "Trainings") },
-          ...(isCenter ? [{ to: "/my-announcements", label: t("ჩემი განცხადებები", "My Announcements") }] : []),
+          ...(isCenter ? [
+            { to: "/my-announcements", label: t("ჩემი განცხადებები", "My Announcements") },
+            { to: "/pricing", label: t("გამოწერა", "Pricing") },
+          ] : []),
           ...(isDoctor ? [{ to: "/certificates", label: t("ჩემი სერტიფიკატები", "My Certificates") }] : []),
         ];
 
@@ -83,13 +87,17 @@ export default function Layout({ children }: { children: ReactNode }) {
     return () => clearInterval(timer);
   }, [user]);
 
+  const loadNotifs = async () => {
+    const { data } = await api.get<Notif[]>("/notifications");
+    setNotifs(data);
+    if (notifCount > 0) { await api.post("/notifications/read-all"); setNotifCount(0); }
+  };
+
   const openNotifs = async () => {
     if (notifOpen) { setNotifOpen(false); return; }
     setMenuOpen(false);
-    const { data } = await api.get<Notif[]>("/notifications");
-    setNotifs(data);
+    await loadNotifs();
     setNotifOpen(true);
-    if (notifCount > 0) { await api.post("/notifications/read-all"); setNotifCount(0); }
   };
 
   const doLogout = () => { logout(); navigate("/"); };
@@ -156,13 +164,6 @@ export default function Layout({ children }: { children: ReactNode }) {
         { to: "/announcements", label: t("ტრენინგები", "Trainings"), icon: <Cap size={16} /> },
         { to: "/chat", label: t("შეტყობინებები", "Messages"), icon: <Chat size={16} /> },
       ];
-  const capabilities = [
-    t("კონფერენციის/ტრენინგის განთავსება", "Post conferences / trainings"),
-    t("ინფორმაციისა და ბანერის გამოქვეყნება", "Publish info and banners"),
-    t("უსდ ქულების მიღება / მინიჭება", "Grant / earn CPD points"),
-    t("მონაცემთა ანალიტიკა", "Data analytics"),
-  ];
-
   return (
     <div className="app">
       <header className="topbar">
@@ -205,7 +206,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             </button>
 
             {user && (
-              <>
+              <div className="top-actions-mobile-hide">
                 <div style={{ position: "relative" }}>
                   <button className="icon-btn" aria-label={t("ნოთიფიკაციები", "Notifications")} onClick={openNotifs}>
                     {notifCount > 0 && <span className="dot">{notifCount > 9 ? "9+" : notifCount}</span>}
@@ -213,7 +214,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                   </button>
                   {notifOpen && (
                     <>
-                      <div style={{ position: "fixed", inset: 0, zIndex: 65 }} onClick={() => setNotifOpen(false)} />
+                      <button type="button" className="dropdown-dismiss" aria-label={t("დახურვა", "Close")} onClick={() => setNotifOpen(false)} />
                       <div className="dropdown wide">
                         <div className="dd-title">{t("ნოთიფიკაციები", "Notifications")}</div>
                         {notifs.length === 0
@@ -228,7 +229,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                   {unreadMsgs > 0 && <span className="dot">{unreadMsgs > 9 ? "9+" : unreadMsgs}</span>}
                   <Chat size={21} />
                 </Link>
-              </>
+              </div>
             )}
 
             <div className="top-divider" />
@@ -249,7 +250,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 </button>
                 {menuOpen && (
                   <>
-                    <div style={{ position: "fixed", inset: 0, zIndex: 65 }} onClick={() => setMenuOpen(false)} />
+                    <button type="button" className="dropdown-dismiss" aria-label={t("დახურვა", "Close")} onClick={() => setMenuOpen(false)} />
                     <div className="dropdown">
                       <Link to="/profile" className="dd-item" onClick={() => setMenuOpen(false)}>
                         {t("ჩემი პროფილი", "My Profile")}
@@ -274,7 +275,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 </button>
                 {loginOpen && (
                   <>
-                    <div style={{ position: "fixed", inset: 0, zIndex: 65 }} onClick={() => setLoginOpen(false)} />
+                    <button type="button" className="dropdown-dismiss" aria-label={t("დახურვა", "Close")} onClick={() => setLoginOpen(false)} />
                     <div className="dropdown login-dropdown">
                       <div className="dd-title">{t("შესვლა", "Sign in")}</div>
                       <form onSubmit={submitLogin} className="login-form">
@@ -325,7 +326,12 @@ export default function Layout({ children }: { children: ReactNode }) {
         aria-label={t("მენიუს დახურვა", "Close menu")}
         onClick={() => setNavOpen(false)}
       />
-      <nav className={`mobile-nav${navOpen ? " open" : ""}`} aria-label={t("მობილური ნავიგაცია", "Mobile navigation")}>
+      <nav
+        className={`mobile-nav${navOpen ? " open" : ""}`}
+        aria-label={t("მობილური ნავიგაცია", "Mobile navigation")}
+        aria-hidden={!navOpen}
+        inert={!navOpen ? true : undefined}
+      >
         <div className="mobile-nav-head">
           <Link to="/" className="logo" onClick={() => setNavOpen(false)}>
             <img src={logoIcon} alt="" className="logo-mark-img logo-mark-img-sm" />
@@ -347,14 +353,49 @@ export default function Layout({ children }: { children: ReactNode }) {
         })}
         {user && (
           <>
-            <Link to="/chat" onClick={() => setNavOpen(false)}>{t("შეტყობინებები", "Messages")}</Link>
+            <Link to="/chat" onClick={() => setNavOpen(false)}>
+              {t("შეტყობინებები", "Messages")}
+              {unreadMsgs > 0 ? ` (${unreadMsgs > 9 ? "9+" : unreadMsgs})` : ""}
+            </Link>
+            <button
+              type="button"
+              className="mobile-nav-action"
+              onClick={() => { void loadNotifs(); setNotifOpen((o) => !o); }}
+            >
+              {t("ნოთიფიკაციები", "Notifications")}
+              {notifCount > 0 ? ` (${notifCount > 9 ? "9+" : notifCount})` : ""}
+            </button>
+            {notifOpen && (
+              <div className="mobile-nav-notifs">
+                {notifs.length === 0
+                  ? <div className="dd-empty">{t("ცარიელია", "Empty")}</div>
+                  : notifs.map((n) => <div key={n.id} className="dd-item">{n.text}</div>)}
+              </div>
+            )}
             <Link to="/profile" onClick={() => setNavOpen(false)}>{t("ჩემი პროფილი", "My Profile")}</Link>
+            {isDoctor && (
+              <Link to="/certificates" onClick={() => setNavOpen(false)}>{t("სერტიფიკატები", "Certificates")}</Link>
+            )}
+            <button type="button" className="mobile-nav-action" onClick={() => { setNavOpen(false); doLogout(); }}>
+              {t("გასვლა", "Log out")}
+            </button>
           </>
         )}
         {!user && (
-          <Link to="/register" onClick={() => setNavOpen(false)}>{t("რეგისტრაცია", "Register")}</Link>
+          <>
+            <Link to="/register" onClick={() => setNavOpen(false)}>{t("რეგისტრაცია", "Register")}</Link>
+            <button
+              type="button"
+              className="mobile-nav-action"
+              onClick={() => { setNavOpen(false); setLoginOpen(true); setLoginError(""); }}
+            >
+              {t("შესვლა", "Sign in")}
+            </button>
+          </>
         )}
       </nav>
+
+      <LinearAdBanner />
 
       <main className="page">{children}</main>
 
@@ -426,12 +467,6 @@ export default function Layout({ children }: { children: ReactNode }) {
             <h4>{t("ბმულები", "Links")}</h4>
             <ul className="links">
               {footerLinks.map((f) => <li key={f.label}><Link to={f.to}>{f.icon} {f.label}</Link></li>)}
-            </ul>
-          </div>
-          <div>
-            <h4>{t("ტრენინგ ცენტრის შესაძლებლობები", "Training Center Features")}</h4>
-            <ul className="checks">
-              {capabilities.map((c) => <li key={c}><Check size={16} /> {c}</li>)}
             </ul>
           </div>
         </div>
