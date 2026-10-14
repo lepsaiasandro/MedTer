@@ -72,6 +72,18 @@ export default function Layout({ children }: { children: ReactNode }) {
   useEffect(() => { refreshBadges(); }, [location.pathname, user]);
   useEffect(() => { setNavOpen(false); setMenuOpen(false); setNotifOpen(false); setLoginOpen(false); }, [location.pathname]);
   useEffect(() => {
+    const openLogin = () => {
+      setNavOpen(false);
+      setMenuOpen(false);
+      setNotifOpen(false);
+      setLoginError("");
+      setLoginOpen(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener("medter:open-login", openLogin);
+    return () => window.removeEventListener("medter:open-login", openLogin);
+  }, []);
+  useEffect(() => {
     if (!navOpen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setNavOpen(false); };
     document.addEventListener("keydown", onKey);

@@ -69,10 +69,34 @@ public static class DbSeeder
         await SeedDemoGroupChatAsync(services);
     }
 
-    /// <summary>Seed PSP / Aversi partner banners once if the table is empty.</summary>
+    /// <summary>Seed PSP / Aversi partner banners once if the table is empty; keep CTA domains in Latin.</summary>
     public static async Task SeedDefaultAdBannersAsync(IServiceProvider services)
     {
         var db = services.GetRequiredService<AppDbContext>();
+
+        // Existing rows may still have Georgian-script CTAs from earlier seeds.
+        var legacy = await db.AdBanners
+            .Where(a => a.CtaKa == "პსპ.გე" || a.CtaEn == "პსპ.გე"
+                     || a.CtaKa == "ავერსი.გე" || a.CtaEn == "ავერსი.გე"
+                     || a.CtaEn == "Visit PSP" || a.CtaEn == "Visit Aversi")
+            .ToListAsync();
+        foreach (var a in legacy)
+        {
+            if (a.Brand.Equals("PSP", StringComparison.OrdinalIgnoreCase)
+                || a.Href.Contains("psp.ge", StringComparison.OrdinalIgnoreCase))
+            {
+                a.CtaKa = "psp.ge";
+                a.CtaEn = "psp.ge";
+            }
+            else if (a.Brand.Equals("Aversi", StringComparison.OrdinalIgnoreCase)
+                     || a.Href.Contains("aversi.ge", StringComparison.OrdinalIgnoreCase))
+            {
+                a.CtaKa = "aversi.ge";
+                a.CtaEn = "aversi.ge";
+            }
+        }
+        if (legacy.Count > 0) await db.SaveChangesAsync();
+
         if (await db.AdBanners.AnyAsync()) return;
 
         db.AdBanners.AddRange(
@@ -84,8 +108,8 @@ public static class DbSeeder
                 TitleEn = "PSP — online pharmacy",
                 TextKa = "45,000+ პროდუქტი, სწრაფი მიწოდება და გარანტირებული ხარისხი.",
                 TextEn = "45,000+ products, fast delivery and guaranteed quality.",
-                CtaKa = "პსპ.გე",
-                CtaEn = "Visit PSP",
+                CtaKa = "psp.ge",
+                CtaEn = "psp.ge",
                 Accent = "#1e4d8c",
                 Accent2 = "#0f2d5c",
                 SortOrder = 0,
@@ -100,8 +124,8 @@ public static class DbSeeder
                 TitleEn = "Aversi — pharmacies across Georgia",
                 TextKa = "აფთიაქები, ონლაინ შეკვეთა და მტრედი ბარათის შეთავაზებები.",
                 TextEn = "Pharmacies, online ordering and Mtredi card offers.",
-                CtaKa = "ავერსი.გე",
-                CtaEn = "Visit Aversi",
+                CtaKa = "aversi.ge",
+                CtaEn = "aversi.ge",
                 Accent = "#c8102e",
                 Accent2 = "#8b0a1e",
                 SortOrder = 1,
@@ -116,8 +140,8 @@ public static class DbSeeder
                 TitleEn = "Aversi online shop",
                 TextKa = "შეუკვეთე მედიკამენტები და პროდუქტები სახლიდან.",
                 TextEn = "Order medicines and products from home.",
-                CtaKa = "ონლაინ შეკვეთა",
-                CtaEn = "Shop online",
+                CtaKa = "shop.aversi.ge",
+                CtaEn = "shop.aversi.ge",
                 Accent = "#c8102e",
                 Accent2 = "#9f1239",
                 SortOrder = 2,

@@ -44,8 +44,8 @@ const FALLBACK: PartnerCreative[] = [
     titleEn: "PSP — online pharmacy",
     textKa: "45,000+ პროდუქტი, სწრაფი მიწოდება და გარანტირებული ხარისხი.",
     textEn: "45,000+ products, fast delivery and guaranteed quality.",
-    ctaKa: "პსპ.გე",
-    ctaEn: "Visit PSP",
+    ctaKa: "psp.ge",
+    ctaEn: "psp.ge",
     accent: "#1e4d8c",
     accent2: "#0f2d5c",
   },
@@ -57,8 +57,8 @@ const FALLBACK: PartnerCreative[] = [
     titleEn: "Aversi — pharmacies across Georgia",
     textKa: "აფთიაქები, ონლაინ შეკვეთა და მტრედი ბარათის შეთავაზებები.",
     textEn: "Pharmacies, online ordering and Mtredi card offers.",
-    ctaKa: "ავერსი.გე",
-    ctaEn: "Visit Aversi",
+    ctaKa: "aversi.ge",
+    ctaEn: "aversi.ge",
     accent: "#c8102e",
     accent2: "#8b0a1e",
   },
@@ -141,7 +141,7 @@ export default function LinearAdBanner({ embedded = false }: { embedded?: boolea
             <strong>{t(item.titleKa, item.titleEn)}</strong>
             <span>{t(item.textKa, item.textEn)}</span>
           </div>
-          <span className="partner-strip-cta">{t(item.ctaKa, item.ctaEn)}</span>
+          <span className="partner-strip-cta">{item.ctaKa || item.ctaEn}</span>
         </a>
         {items.length > 1 && (
           <div className="partner-strip-dots" role="tablist" aria-label={t("პარტნიორები", "Partners")}>

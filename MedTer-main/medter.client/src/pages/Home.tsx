@@ -85,11 +85,14 @@ function Landing() {
             )}
           </p>
           <div className="landing-cta">
-            <button className="btn btn-primary btn-lg" onClick={() => navigate("/centers")}>
-              {t("ცენტრების ნახვა", "Browse centers")}
-            </button>
-            <button className="btn btn-ghost btn-lg" onClick={() => navigate("/register")}>
+            <button className="btn btn-primary btn-lg" onClick={() => navigate("/register")}>
               {t("რეგისტრაცია", "Register")}
+            </button>
+            <button
+              className="btn btn-ghost btn-lg"
+              onClick={() => window.dispatchEvent(new Event("medter:open-login"))}
+            >
+              {t("შესვლა", "Sign in")}
             </button>
           </div>
         </div>
