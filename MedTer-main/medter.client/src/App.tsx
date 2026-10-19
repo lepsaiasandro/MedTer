@@ -39,10 +39,17 @@ export default function App() {
     <>
       <AmbientBackground />
       <Routes>
-        <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
+        <Route path="/register" element={user ? <Navigate to={isAdmin ? "/" : "/announcements"} replace /> : <Register />} />
 
-        {/* Public: home + training centers list */}
-        <Route path="/" element={<Shell>{isAdmin ? <AdminDashboard /> : <Home />}</Shell>} />
+        {/* Public landing; logged-in users land on the feed */}
+        <Route
+          path="/"
+          element={
+            <Shell>
+              {isAdmin ? <AdminDashboard /> : user ? <Navigate to="/announcements" replace /> : <Home />}
+            </Shell>
+          }
+        />
         <Route path="/centers" element={<Shell><Dashboard /></Shell>} />
 
         {/* Auth required */}
@@ -55,7 +62,7 @@ export default function App() {
         <Route path="/profile" element={<Shell><Protected><Profile /></Protected></Shell>} />
         <Route path="/pricing" element={<Shell><Pricing /></Shell>} />
         <Route path="/admin" element={<Shell><Protected><AdminDashboard /></Protected></Shell>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to={user && !isAdmin ? "/announcements" : "/"} replace />} />
       </Routes>
     </>
   );

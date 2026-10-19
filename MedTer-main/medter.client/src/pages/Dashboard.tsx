@@ -111,6 +111,9 @@ export default function Dashboard() {
       <LinearAdBanner embedded random placement="centers" />
 
       <FilterBar
+        collapsible
+        filtersLabel={t("ფილტრები", "Filters")}
+        activeCount={(city ? 1 : 0) + (sort !== "name" ? 1 : 0)}
         search={
           <SearchField
             value={search}

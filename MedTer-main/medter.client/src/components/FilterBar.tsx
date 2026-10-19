@@ -1,5 +1,5 @@
-import type { ReactNode, SelectHTMLAttributes, InputHTMLAttributes } from "react";
-import { Search, X, Sliders } from "./icons";
+import { useState, type ReactNode, type SelectHTMLAttributes, type InputHTMLAttributes } from "react";
+import { Search, X, Sliders, ChevronDown } from "./icons";
 
 export type FilterChip = {
   id: string;
@@ -161,15 +161,51 @@ type FilterBarProps = {
   chips?: ReactNode;
   meta?: ReactNode;
   className?: string;
+  /** Hide filters behind a single toggle (closed by default). */
+  collapsible?: boolean;
+  /** Button label when collapsible. */
+  filtersLabel?: string;
+  /** Number of active filters — shown as a badge on the toggle. */
+  activeCount?: number;
 };
 
 /** Unified filter shell used across list pages. */
-export function FilterBar({ search, filters, chips, meta, className }: FilterBarProps) {
+export function FilterBar({
+  search,
+  filters,
+  chips,
+  meta,
+  className,
+  collapsible = false,
+  filtersLabel = "Filters",
+  activeCount = 0,
+}: FilterBarProps) {
+  const [open, setOpen] = useState(false);
+  const showFilters = !collapsible || open;
+
   return (
-    <div className={`filter-bar${className ? ` ${className}` : ""}`}>
+    <div className={`filter-bar${collapsible ? " filter-bar--collapsible" : ""}${open ? " is-open" : ""}${className ? ` ${className}` : ""}`}>
       <div className="fb-row">
         {search ?? null}
-        {filters ? <div className="fb-filters">{filters}</div> : null}
+        {collapsible && filters ? (
+          <button
+            type="button"
+            className={`fb-filters-toggle${activeCount > 0 ? " has-active" : ""}${open ? " is-open" : ""}`}
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-controls="fb-filters-panel"
+          >
+            <Sliders size={15} aria-hidden />
+            <span>{filtersLabel}</span>
+            {activeCount > 0 && <span className="fb-filters-badge">{activeCount}</span>}
+            <ChevronDown size={14} aria-hidden className="fb-filters-chevron" />
+          </button>
+        ) : null}
+        {showFilters && filters ? (
+          <div className="fb-filters" id={collapsible ? "fb-filters-panel" : undefined}>
+            {filters}
+          </div>
+        ) : null}
       </div>
       {(chips || meta) && (
         <div className="fb-foot">

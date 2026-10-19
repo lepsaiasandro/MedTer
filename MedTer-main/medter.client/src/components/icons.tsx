@@ -79,3 +79,6 @@ export const ThumbUp = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
 export const ExternalLink = (p: IconProps) => (
   <Icon sw={2} {...p}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" /></Icon>
 );
+export const Video = (p: IconProps) => (
+  <Icon sw={2} {...p}><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" /></Icon>
+);

@@ -3,15 +3,15 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import { Calendar, Pin, Mail, Search, Check, Bookmark, Cap, Chat, X, ExternalLink, Star, ThumbUp } from "../components/icons";
+import { Calendar, Pin, Search, Check, Bookmark, Cap, Chat, X, ExternalLink, Video } from "../components/icons";
 import ShareMenu from "../components/ShareMenu";
 import PointsPanel from "../components/PointsPanel";
 import EmptyState from "../components/EmptyState";
 import AuthRequired from "../components/AuthRequired";
-import LinearAdBanner, { useSponsoredCreatives } from "../components/LinearAdBanner";
+import { useSponsoredCreatives } from "../components/LinearAdBanner";
 import SponsoredEventCard from "../components/SponsoredEventCard";
 import EventDetailModal from "../components/EventDetailModal";
-import { FilterBar, FilterSelect, FilterToggle, FilterChips, ResultMeta, type FilterChip } from "../components/FilterBar";
+import { FilterBar, FilterSelect, FilterToggle, FilterChips, ResultMeta, SearchField, type FilterChip } from "../components/FilterBar";
 import { matchesSearch } from "../lib/search";
 import { pickCardBanner } from "../lib/cardBanners";
 
@@ -61,6 +61,8 @@ type Flash = {
   meetingFormat?: string;
 };
 
+type WhenFilter = "upcoming" | "week" | "month" | "past" | "all";
+
 const isHttpUrl = (value: string) => /^https?:\/\//i.test(value.trim());
 
 function dayKey(iso?: string) {
@@ -70,15 +72,38 @@ function dayKey(iso?: string) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function startOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+function matchesWhen(iso: string | undefined, when: WhenFilter) {
+  if (when === "all") return true;
+  if (!iso) return when === "upcoming" || when === "week" || when === "month";
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return when !== "past";
+  const today = startOfDay(new Date());
+  if (when === "past") return t < today;
+  if (when === "upcoming") return t >= today;
+  if (when === "week") {
+    const end = today + 7 * 24 * 60 * 60 * 1000;
+    return t >= today && t < end;
+  }
+  if (when === "month") {
+    const end = today + 30 * 24 * 60 * 60 * 1000;
+    return t >= today && t < end;
+  }
+  return true;
+}
+
 export default function Announcements() {
   const { user } = useAuth();
   if (!user) {
     return (
       <AuthRequired
-        titleKa="ტრენინგების ფიდის სანახავად ანგარიში გჭირდება"
-        titleEn="You need an account to view the trainings feed"
-        textKa="შექმენი ანგარიში ან შედი — შემდეგ დაინახავ ყველა ტრენინგს Events-ის მსგავს ფიდში."
-        textEn="Create an account or sign in — then you'll see all trainings in an Events-style feed."
+        titleKa="ტრენინგების სანახავად ანგარიში გჭირდება"
+        titleEn="You need an account to view trainings"
+        textKa="შექმენი ანგარიში ან შედი — შემდეგ დაინახავ ყველა ტრენინგს."
+        textEn="Create an account or sign in — then you'll see all trainings."
       />
     );
   }
@@ -101,19 +126,22 @@ function AnnouncementsFeed() {
   const [modalId, setModalId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
-  /** Local like counts (seeded from engagement; Like toggles favorite). */
-  const [likeCounts, setLikeCounts] = useState<Record<number, number>>({});
 
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [category, setCategory] = useState(() => searchParams.get("cat") ?? "");
   const [format, setFormat] = useState(() => searchParams.get("format") ?? "");
   const [city, setCity] = useState(() => searchParams.get("city") ?? "");
-  const [sort, setSort] = useState(() => searchParams.get("sort") || "newest");
-  const [favOnly, setFavOnly] = useState(() => searchParams.get("fav") === "1");
+  const [sort, setSort] = useState(() => searchParams.get("sort") || "date");
+  const [when, setWhen] = useState<WhenFilter>(() => {
+    const w = searchParams.get("when");
+    if (w === "week" || w === "month" || w === "past" || w === "all" || w === "upcoming") return w;
+    // Default: show everything — demo seed dates are often already past.
+    return "all";
+  });
+  const [savedOnly, setSavedOnly] = useState(() => searchParams.get("saved") === "1" || searchParams.get("fav") === "1");
 
   useEffect(() => {
-    const q = searchParams.get("q") ?? "";
-    setSearch(q);
+    setSearch(searchParams.get("q") ?? "");
   }, [searchParams]);
 
   const fmtDate = (iso?: string) => {
@@ -180,18 +208,6 @@ function AnnouncementsFeed() {
   useEffect(() => { load(); }, [isDoctor]);
 
   useEffect(() => {
-    setLikeCounts((prev) => {
-      const next = { ...prev };
-      for (const a of items) {
-        if (next[a.id] == null) {
-          next[a.id] = a.interestedCount + (a.isFavorite ? 1 : 0);
-        }
-      }
-      return next;
-    });
-  }, [items]);
-
-  useEffect(() => {
     if (searchParams.get("tab") === "centers") {
       navigate("/centers", { replace: true });
     }
@@ -229,20 +245,29 @@ function AnnouncementsFeed() {
   const writeFilterParams = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
     for (const [key, val] of Object.entries(patch)) {
-      if (val === null || val === "" || (key === "sort" && val === "newest") || (key === "fav" && val !== "1")) {
-        next.delete(key);
-      } else {
-        next.set(key, val);
-      }
+      const drop =
+        val === null ||
+        val === "" ||
+        (key === "sort" && val === "date") ||
+        (key === "when" && val === "all") ||
+        ((key === "saved" || key === "fav") && val !== "1");
+      if (drop) next.delete(key);
+      else next.set(key, val);
     }
+    next.delete("fav");
     setSearchParams(next, { replace: true });
   };
 
+  const setSearchQ = (v: string) => {
+    setSearch(v);
+    writeFilterParams({ q: v.trim() || null });
+  };
   const setCategoryQ = (v: string) => { setCategory(v); writeFilterParams({ cat: v || null }); };
   const setFormatQ = (v: string) => { setFormat(v); writeFilterParams({ format: v || null }); };
   const setCityQ = (v: string) => { setCity(v); writeFilterParams({ city: v || null }); };
   const setSortQ = (v: string) => { setSort(v); writeFilterParams({ sort: v }); };
-  const setFavOnlyQ = (v: boolean) => { setFavOnly(v); writeFilterParams({ fav: v ? "1" : null }); };
+  const setWhenQ = (v: WhenFilter) => { setWhen(v); writeFilterParams({ when: v }); };
+  const setSavedOnlyQ = (v: boolean) => { setSavedOnly(v); writeFilterParams({ saved: v ? "1" : null }); };
 
   const setTab = (mine: boolean) => {
     setModalId(null);
@@ -301,15 +326,6 @@ function AnnouncementsFeed() {
           city: res.data.city ?? a.city,
           format: res.data.format ?? a.format,
         };
-        /* Going implies Interested (Facebook Events behavior) */
-        if (!a.isFavorite) {
-          try { await api.post(`/announcements/${a.id}/favorite`); } catch { /* optional */ }
-          merged.isFavorite = true;
-          setLikeCounts((c) => ({
-            ...c,
-            [a.id]: Math.max(0, (c[a.id] ?? a.interestedCount) + 1),
-          }));
-        }
         patchLists(a.id, merged);
         const updated = { ...a, ...merged, isInterested: true, interestedCount: nextCount };
         setMineItems((prev) => {
@@ -340,17 +356,14 @@ function AnnouncementsFeed() {
     }
   };
 
-  const toggleFav = async (a: Announcement) => {
+  const toggleSaved = async (a: Announcement) => {
     const next = !a.isFavorite;
-    const prevCount = likeCounts[a.id] ?? a.interestedCount;
     patchLists(a.id, { isFavorite: next });
-    setLikeCounts((c) => ({ ...c, [a.id]: Math.max(0, prevCount + (next ? 1 : -1)) }));
     try {
       if (a.isFavorite) await api.delete(`/announcements/${a.id}/favorite`);
       else await api.post(`/announcements/${a.id}/favorite`);
     } catch {
       patchLists(a.id, { isFavorite: a.isFavorite });
-      setLikeCounts((c) => ({ ...c, [a.id]: prevCount }));
     }
   };
 
@@ -372,15 +385,19 @@ function AnnouncementsFeed() {
       if (category && a.category !== category) return false;
       if (format && a.format !== format) return false;
       if (city && a.city !== city) return false;
-      if (!mineTab && favOnly && !a.isFavorite) return false;
+      if (!mineTab && savedOnly && !a.isFavorite) return false;
+      if (!mineTab && !matchesWhen(a.startDate, when)) return false;
       return true;
     });
-    if (sort === "date") list = [...list].sort((a, b) => new Date(a.startDate ?? 0).getTime() - new Date(b.startDate ?? 0).getTime());
-    else if (sort === "points") list = [...list].sort((a, b) => b.points - a.points);
+    if (sort === "points") list = [...list].sort((a, b) => b.points - a.points);
     else if (sort === "interested") list = [...list].sort((a, b) => b.interestedCount - a.interestedCount);
-    else list = [...list].sort((a, b) => new Date(b.startDate ?? 0).getTime() - new Date(a.startDate ?? 0).getTime() || b.id - a.id);
+    else if (when === "past") {
+      list = [...list].sort((a, b) => new Date(b.startDate ?? 0).getTime() - new Date(a.startDate ?? 0).getTime() || b.id - a.id);
+    } else {
+      list = [...list].sort((a, b) => new Date(a.startDate ?? Number.MAX_SAFE_INTEGER).getTime() - new Date(b.startDate ?? Number.MAX_SAFE_INTEGER).getTime() || b.id - a.id);
+    }
     return list;
-  }, [source, search, category, format, city, favOnly, sort, mineTab]);
+  }, [source, search, category, format, city, savedOnly, sort, when, mineTab]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Announcement[]>();
@@ -393,15 +410,24 @@ function AnnouncementsFeed() {
     return [...map.entries()];
   }, [visible]);
 
-  const hasFilters = Boolean(search || category || format || city || favOnly);
+  const hasFilters = Boolean(search || category || format || city || savedOnly || when !== "all");
 
   const clearFilters = () => {
-    setSearch(""); setCategory(""); setFormat(""); setCity(""); setFavOnly(false);
-    writeFilterParams({ q: null, cat: null, format: null, city: null, fav: null });
+    setSearch(""); setCategory(""); setFormat(""); setCity(""); setSavedOnly(false); setWhen("all");
+    writeFilterParams({ q: null, cat: null, format: null, city: null, saved: null, when: null });
+  };
+
+  const whenLabel = (w: WhenFilter) => {
+    if (w === "week") return t("ამ კვირაში", "This week");
+    if (w === "month") return t("ამ თვეში", "This month");
+    if (w === "past") return t("გასული", "Past");
+    if (w === "upcoming") return t("მომავალი", "Upcoming");
+    return t("ყველა", "All");
   };
 
   const activeChips: FilterChip[] = [
-    search ? { id: "q", label: `\u201C${search.trim()}\u201D`, onClear: () => writeFilterParams({ q: null }) } : null,
+    search ? { id: "q", label: `\u201C${search.trim()}\u201D`, onClear: () => setSearchQ("") } : null,
+    when !== "all" ? { id: "when", label: whenLabel(when), onClear: () => setWhenQ("all") } : null,
     category ? { id: "cat", label: category, onClear: () => setCategoryQ("") } : null,
     format ? {
       id: "format",
@@ -409,7 +435,7 @@ function AnnouncementsFeed() {
       onClear: () => setFormatQ(""),
     } : null,
     city ? { id: "city", label: city, onClear: () => setCityQ("") } : null,
-    favOnly && !mineTab ? { id: "fav", label: t("რჩეულები", "Favorites"), onClear: () => setFavOnlyQ(false) } : null,
+    savedOnly && !mineTab ? { id: "saved", label: t("შენახული", "Saved"), onClear: () => setSavedOnlyQ(false) } : null,
   ].filter(Boolean) as FilterChip[];
 
   const placeLabel = (a: Announcement) => {
@@ -423,6 +449,16 @@ function AnnouncementsFeed() {
     if (!parts) return t("თარიღი მითითებული არ არის", "Date not set");
     return `${parts.weekday} · ${parts.day} ${parts.month} ${parts.year}`;
   };
+
+  const deadlineSoon = (iso?: string) => {
+    if (!iso) return false;
+    const t0 = new Date(iso).getTime();
+    if (isNaN(t0)) return false;
+    const now = Date.now();
+    return t0 >= now && t0 - now <= 7 * 24 * 60 * 60 * 1000;
+  };
+
+  let feedIndex = 0;
 
   return (
     <div className="announcements-layout">
@@ -453,16 +489,14 @@ function AnnouncementsFeed() {
 
         <div className="page-head events-page-head">
           <div className="h-text">
-            <h1>{mineTab ? t("ჩემი ტრენინგები", "My Trainings") : t("ტრენინგები", "Trainings")}</h1>
+            <h1>{mineTab ? t("ჩემი ტრენინგები", "My Trainings") : t("ფიდი", "Feed")}</h1>
             <p>
               {mineTab
-                ? t("შენი რეგისტრაციები — თარიღი და დეტალები", "Your registrations — dates and details")
-                : t("Events ფიდი — დაათვალიერე და დაარეგისტრირდი", "Events feed — browse and register")}
+                ? t("შენი რეგისტრაციები — თარიღი, ლინკი და დეტალები", "Your registrations — dates, links and details")
+                : t("იპოვე ტრენინგი და დარეგისტრირდი", "Find a training and register")}
             </p>
           </div>
         </div>
-
-        <LinearAdBanner embedded random placement="trainings" />
 
         {isDoctor && (
           <div className="segment" style={{ marginBottom: 16 }}>
@@ -476,7 +510,33 @@ function AnnouncementsFeed() {
           </div>
         )}
 
+        {!mineTab && (
+          <div className="when-chips" role="group" aria-label={t("პერიოდი", "Period")}>
+            {(["all", "upcoming", "week", "month", "past"] as WhenFilter[]).map((w) => (
+              <button
+                key={w}
+                type="button"
+                className={`when-chip${when === w ? " active" : ""}`}
+                onClick={() => setWhenQ(w)}
+              >
+                {whenLabel(w)}
+              </button>
+            ))}
+          </div>
+        )}
+
         <FilterBar
+          collapsible
+          filtersLabel={t("ფილტრები", "Filters")}
+          activeCount={activeChips.filter((c) => c.id !== "q" && c.id !== "when").length + (sort !== "date" ? 1 : 0)}
+          search={
+            <SearchField
+              value={search}
+              onChange={setSearchQ}
+              placeholder={t("ძებნა ტრენინგებში…", "Search trainings…")}
+              aria-label={t("ძებნა", "Search")}
+            />
+          }
           filters={
             <>
               <FilterSelect
@@ -506,24 +566,23 @@ function AnnouncementsFeed() {
               <FilterSelect
                 value={sort}
                 onChange={setSortQ}
-                defaultValue="newest"
+                defaultValue="date"
                 options={[
-                  { value: "newest", label: t("უახლესი", "Newest") },
                   { value: "date", label: t("თარიღით", "By date") },
                   { value: "points", label: t("ქულით", "By points") },
-                  { value: "interested", label: t("პოპულარობით", "By interest") },
+                  { value: "interested", label: t("პოპულარობით", "By popularity") },
                 ]}
                 aria-label={t("დალაგება", "Sort")}
               />
               {isDoctor && !mineTab && (
                 <FilterToggle
-                  active={favOnly}
-                  onClick={() => setFavOnlyQ(!favOnly)}
-                  title={t("რჩეულები", "Favorites")}
-                  aria-label={t("რჩეულები", "Favorites")}
+                  active={savedOnly}
+                  onClick={() => setSavedOnlyQ(!savedOnly)}
+                  title={t("შენახული", "Saved")}
+                  aria-label={t("შენახული", "Saved")}
                 >
-                  <Bookmark size={15} filled={favOnly} />
-                  <span>{t("რჩეულები", "Favorites")}</span>
+                  <Bookmark size={15} filled={savedOnly} />
+                  <span>{t("შენახული", "Saved")}</span>
                 </FilterToggle>
               )}
             </>
@@ -578,18 +637,26 @@ function AnnouncementsFeed() {
           <EmptyState
             icon={<Search size={42} sw={1.6} />}
             title={t("ვერაფერი მოიძებნა", "Nothing found")}
-            text={t("შეცვალე ფილტრები ან საძიებო სიტყვა ზედა ძებნაში.", "Try different filters or the top search.")}
+            text={
+              when !== "all" && source.length > 0
+                ? t("ამ პერიოდში ტრენინგი არ არის — სცადე ყველა.", "No trainings in this period — try All.")
+                : t("შეცვალე ფილტრები ან პერიოდი.", "Try different filters or period.")
+            }
             action={
-              <button className="btn btn-ghost btn-sm" onClick={clearFilters}>
-                {t("გასუფთავება", "Clear")}
-              </button>
+              when !== "all" && source.length > 0 ? (
+                <button className="btn btn-primary btn-sm" onClick={() => setWhenQ("all")}>
+                  {t("ყველას ნახვა", "Show all")}
+                </button>
+              ) : (
+                <button className="btn btn-ghost btn-sm" onClick={clearFilters}>
+                  {t("გასუფთავება", "Clear")}
+                </button>
+              )
             }
           />
         ) : (
           <div className="events-feed fb-events">
-            {grouped.map(([key, list]) => {
-              let feedIndex = 0;
-              return (
+            {grouped.map(([key, list]) => (
               <section key={key} className="events-day">
                 <h2 className="events-day-title">{sectionTitle(key, list[0])}</h2>
                 <div className="events-day-list">
@@ -600,18 +667,17 @@ function AnnouncementsFeed() {
                     const parts = dateParts(a.startDate);
                     const bannerUrl = pickCardBanner(a.id, a.imageUrl);
                     const time = fmtTime(a.startDate);
-                    const likes = likeCounts[a.id] ?? a.interestedCount;
-                    const interestedSoft = a.isFavorite || going;
                     const whenLine = [
                       parts ? `${parts.weekday}` : null,
                       time || null,
                       a.category || null,
                     ].filter(Boolean).join(" · ");
+                    const showDeadline = a.registrationDeadline && !going && deadlineSoon(a.registrationDeadline);
 
                     const card = (
                       <article
                         key={a.id}
-                        className={`fb-event${going ? " is-going" : ""}${a.isFavorite ? " is-liked" : ""}`}
+                        className={`fb-event${going ? " is-going" : ""}${a.isFavorite ? " is-saved" : ""}`}
                         onClick={() => setModalId(a.id)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
@@ -644,7 +710,7 @@ function AnnouncementsFeed() {
                           <h3 className="fb-event-title">{a.title}</h3>
 
                           <div className="fb-event-host">
-                            {t("ღონისძიება:", "Event by")}{" "}
+                            {t("ორგანიზატორი:", "Hosted by")}{" "}
                             {a.centerUserId ? (
                               <Link to={`/centers/${a.centerUserId}`} onClick={stopCard}>{a.centerName}</Link>
                             ) : (
@@ -653,7 +719,7 @@ function AnnouncementsFeed() {
                           </div>
 
                           <div className="fb-event-place">
-                            {online ? <Mail size={14} /> : <Pin size={14} />}
+                            {online ? <Video size={14} /> : <Pin size={14} />}
                             <span>{place}</span>
                             {a.price > 0 && (
                               <>
@@ -667,62 +733,57 @@ function AnnouncementsFeed() {
                                 <span>{a.points} {t("ქულა", "pts")}</span>
                               </>
                             )}
+                            {typeof a.seats === "number" && a.seats > 0 && !going && (
+                              <>
+                                <span className="fb-event-dot">·</span>
+                                <span>{a.seats} {t("ადგილი", "seats")}</span>
+                              </>
+                            )}
                           </div>
 
-                          <div className="fb-event-social">
-                            <div className="fb-event-reactions">
-                              <span className="fb-like-badge" aria-hidden="true">
-                                <ThumbUp size={11} filled />
-                              </span>
-                              <span>{likes}</span>
-                              <span className="fb-event-dot">·</span>
+                          {showDeadline && (
+                            <div className="fb-event-deadline">
+                              {t("რეგისტრაციის ვადა:", "Register by:")} {fmtDate(a.registrationDeadline)}
+                            </div>
+                          )}
+
+                          {(going || a.interestedCount > 0) && (
+                            <div className="fb-event-social">
                               <span>
                                 {a.interestedCount} {t("მიდის", "going")}
-                                {(interestedSoft || a.interestedCount > 0) && (
-                                  <> · {t("დაინტერესებული", "interested")}</>
-                                )}
                               </span>
                             </div>
-                          </div>
+                          )}
+
+                          {going && (a.meetingAccess || a.city) && (
+                            <div className="fb-event-access" onClick={stopCard}>
+                              {renderMeetingAccess(a)}
+                            </div>
+                          )}
 
                           <div className="fb-event-actions" onClick={stopCard}>
                             {isDoctor && (
                               <button
                                 type="button"
-                                className={`fb-rsvp${a.isFavorite ? " active like" : ""}`}
-                                disabled={busyId === a.id}
-                                onClick={() => toggleFav(a)}
-                                aria-pressed={a.isFavorite}
-                              >
-                                <ThumbUp size={16} filled={a.isFavorite} />
-                                {t("მომწონს", "Like")}
-                              </button>
-                            )}
-                            {isDoctor && (
-                              <button
-                                type="button"
-                                className={`fb-rsvp${interestedSoft ? " active interested" : ""}`}
-                                disabled={busyId === a.id}
-                                onClick={() => {
-                                  if (going) return;
-                                  void toggleFav(a);
-                                }}
-                                aria-pressed={interestedSoft}
-                              >
-                                <Star size={16} filled={interestedSoft} />
-                                {t("დაინტერესებული", "Interested")}
-                              </button>
-                            )}
-                            {isDoctor && (
-                              <button
-                                type="button"
-                                className={`fb-rsvp${going ? " active going" : ""}`}
+                                className={`fb-rsvp fb-rsvp-primary${going ? " active going" : ""}`}
                                 disabled={busyId === a.id}
                                 onClick={() => toggleInterest(a)}
                                 aria-pressed={going}
                               >
                                 <Check size={16} />
-                                {going ? t("მივდივარ", "Going") : t("მივდივარ", "Going")}
+                                {going ? t("რეგისტრირებული", "Registered") : t("რეგისტრაცია", "Register")}
+                              </button>
+                            )}
+                            {isDoctor && (
+                              <button
+                                type="button"
+                                className={`fb-rsvp${a.isFavorite ? " active saved" : ""}`}
+                                disabled={busyId === a.id}
+                                onClick={() => toggleSaved(a)}
+                                aria-pressed={a.isFavorite}
+                              >
+                                <Bookmark size={16} filled={a.isFavorite} />
+                                {a.isFavorite ? t("შენახული", "Saved") : t("შენახვა", "Save")}
                               </button>
                             )}
                             {mineTab && a.hasGroupChat && (
@@ -742,9 +803,8 @@ function AnnouncementsFeed() {
 
                     const nodes = [card];
                     feedIndex += 1;
-                    /* Insert a Sponsored card every 3 trainings (Facebook feed style). */
-                    if (!mineTab && sponsored.length > 0 && feedIndex % 3 === 0) {
-                      const ad = sponsored[(Math.floor(feedIndex / 3) - 1) % sponsored.length];
+                    if (!mineTab && sponsored.length > 0 && feedIndex % 5 === 0) {
+                      const ad = sponsored[(Math.floor(feedIndex / 5) - 1) % sponsored.length];
                       nodes.push(
                         <SponsoredEventCard key={`sponsored-${key}-${a.id}-${ad.id}`} item={ad} />
                       );
@@ -753,8 +813,7 @@ function AnnouncementsFeed() {
                   })}
                 </div>
               </section>
-              );
-            })}
+            ))}
           </div>
         )}
       </div>
@@ -768,7 +827,6 @@ function AnnouncementsFeed() {
       {modalAnnouncement && (
         <EventDetailModal
           a={modalAnnouncement}
-          likes={likeCounts[modalAnnouncement.id] ?? modalAnnouncement.interestedCount}
           isDoctor={isDoctor}
           mineTab={mineTab}
           busyId={busyId}
@@ -785,7 +843,7 @@ function AnnouncementsFeed() {
             : null}
           onClose={() => setModalId(null)}
           onStop={stopCard}
-          onLike={() => { void toggleFav(modalAnnouncement); }}
+          onSave={() => { void toggleSaved(modalAnnouncement); }}
           onGoing={() => { void toggleInterest(modalAnnouncement); }}
           onChat={() => navigate("/chat")}
         />

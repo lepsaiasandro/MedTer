@@ -268,7 +268,7 @@ public static class DbSeeder
                 Description = "ინტენსიური კურსი ECG ინტერპრეტაციასა და გადაუდებელ კარდიოლოგიაზე.",
                 City = "თბილისი", Duration = "2 დღე", Language = "ქართული",
                 Points = 20, Price = 0, Seats = 50, Status = "Published",
-                CenterUserId = promed.Id, StartDate = new DateTime(2026, 10, 15)
+                CenterUserId = promed.Id, StartDate = DateTime.UtcNow.Date.AddDays(14)
             });
             db.Announcements.Add(new Announcement
             {
@@ -278,7 +278,7 @@ public static class DbSeeder
                 Description = "თანამედროვე მიდგომები დიაგნოსტიკასა და მკურნალობაში.",
                 Duration = "6 საათი", Language = "ქართული",
                 Points = 8, Price = 0, Seats = 100, Status = "Published",
-                CenterUserId = promed.Id, StartDate = new DateTime(2026, 10, 5)
+                CenterUserId = promed.Id, StartDate = DateTime.UtcNow.Date.AddDays(28)
             });
         }
         if (medlearn is not null)
@@ -291,7 +291,7 @@ public static class DbSeeder
                 Description = "პრაქტიკული ტრენინგი BLS/ACLS პროტოკოლებზე.",
                 City = "ბათუმი", Duration = "1 დღე", Language = "ქართული",
                 Points = 16, Price = 0, Seats = 40, Status = "Published",
-                CenterUserId = medlearn.Id, StartDate = new DateTime(2026, 9, 28)
+                CenterUserId = medlearn.Id, StartDate = DateTime.UtcNow.Date.AddDays(45)
             });
         }
         await db.SaveChangesAsync();

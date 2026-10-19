@@ -34,13 +34,12 @@ export default function Layout({ children }: { children: ReactNode }) {
     : isAdmin
       ? [
           { to: "/", label: t("ადმინი", "Admin"), full: t("ადმინ პანელი", "Admin Panel") },
-          { to: "/announcements", label: t("ტრენინგები", "Trainings") },
+          { to: "/announcements", label: t("ფიდი", "Feed") },
           { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
           { to: "/profile", label: t("პროფილი", "Profile") },
         ]
       : [
-          { to: "/", label: t("მთავარი", "Home") },
-          { to: "/announcements", label: t("ტრენინგები", "Trainings") },
+          { to: "/announcements", label: t("ფიდი", "Feed") },
           { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
           ...(isCenter ? [
             { to: "/dashboard", label: t("დაფა", "Dashboard") },
@@ -138,7 +137,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       setLoginOpen(false);
       setEmail("");
       setPassword("");
-      navigate("/");
+      navigate(data.role === "Admin" ? "/" : "/announcements");
     } catch (err: any) {
       const http = err?.response?.status;
       const body = err?.response?.data;
@@ -173,18 +172,24 @@ export default function Layout({ children }: { children: ReactNode }) {
       )}`
     : "#";
 
+  const homeTo = isGuest || isAdmin ? "/" : "/announcements";
   const footerLinks = isGuest
     ? [
         { to: "/", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
         { to: "/announcements", label: t("ტრენინგები", "Trainings"), icon: <Cap size={16} /> },
         { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
       ]
-    : [
-        { to: "/", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
-        { to: "/announcements", label: t("ტრენინგები", "Trainings"), icon: <Cap size={16} /> },
-        { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
-        { to: "/chat", label: t("შეტყობინებები", "Messages"), icon: <Chat size={16} /> },
-      ];
+    : isAdmin
+      ? [
+          { to: "/", label: t("ადმინი", "Admin"), icon: <Home size={16} /> },
+          { to: "/announcements", label: t("ფიდი", "Feed"), icon: <Cap size={16} /> },
+          { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
+        ]
+      : [
+          { to: "/announcements", label: t("ფიდი", "Feed"), icon: <Cap size={16} /> },
+          { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
+          { to: "/chat", label: t("შეტყობინებები", "Messages"), icon: <Chat size={16} /> },
+        ];
   return (
     <div className="app">
       <header className="topbar">
@@ -199,7 +204,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             {navOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
 
-          <Link to="/" className="logo" onClick={() => setNavOpen(false)}>
+          <Link to={homeTo} className="logo" onClick={() => setNavOpen(false)}>
             <img src={logoIcon} alt="" className="logo-mark-img" />
             <span className="logo-name">Med<span>Ter</span>.ge</span>
           </Link>
@@ -373,7 +378,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         inert={!navOpen ? true : undefined}
       >
         <div className="mobile-nav-head">
-          <Link to="/" className="logo" onClick={() => setNavOpen(false)}>
+          <Link to={homeTo} className="logo" onClick={() => setNavOpen(false)}>
             <img src={logoIcon} alt="" className="logo-mark-img logo-mark-img-sm" />
             <span className="logo-name">Med<span>Ter</span></span>
           </Link>

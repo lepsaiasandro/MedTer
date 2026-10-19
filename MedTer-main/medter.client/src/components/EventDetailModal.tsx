@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { usePrefs } from "../i18n";
 import ShareMenu from "./ShareMenu";
-import { Calendar, Pin, Mail, Check, Cap, Chat, Star, ThumbUp } from "./icons";
+import { Calendar, Pin, Check, Cap, Chat, Bookmark, Video } from "./icons";
 import { pickCardBanner } from "../lib/cardBanners";
 
 export interface EventDetailData {
@@ -17,6 +17,7 @@ export interface EventDetailData {
   language?: string;
   points: number;
   price: number;
+  seats?: number;
   imageUrl?: string;
   startDate?: string;
   registrationDeadline?: string;
@@ -30,7 +31,6 @@ export interface EventDetailData {
 
 type Props = {
   a: EventDetailData;
-  likes: number;
   isDoctor: boolean;
   mineTab: boolean;
   busyId: number | null;
@@ -41,20 +41,20 @@ type Props = {
   meetingAccess: React.ReactNode;
   onClose: () => void;
   onStop: (e: React.MouseEvent | React.KeyboardEvent) => void;
-  onLike: () => void;
+  onSave: () => void;
   onGoing: () => void;
   onChat: () => void;
 };
 
 export default function EventDetailModal({
-  a, likes, isDoctor, mineTab, busyId, whenFull, placeLabel, dateParts, fmtDate,
-  meetingAccess, onClose, onStop, onLike, onGoing, onChat,
+  a, isDoctor, mineTab, busyId, whenFull, placeLabel, dateParts, fmtDate,
+  meetingAccess, onClose, onStop, onSave, onGoing, onChat,
 }: Props) {
   const { t } = usePrefs();
   const cover = pickCardBanner(a.id, a.imageUrl);
   const going = mineTab || a.isInterested;
-  const interestedSoft = a.isFavorite || going;
   const hostInitial = (a.centerName || "?").charAt(0).toUpperCase();
+  const online = a.format === "ონლაინ";
 
   return (
     <div className="modal fb-event-modal" onClick={onClose}>
@@ -84,9 +84,9 @@ export default function EventDetailModal({
           <div className="fb-event-page-when">{whenFull}</div>
           <h2 className="fb-event-page-title">{a.title}</h2>
           <div className="fb-event-page-privacy">
-            {t("საჯარო ღონისძიება", "Public event")}
+            {t("ტრენინგი", "Training")}
             <span className="fb-event-dot">·</span>
-            {t("მასპინძელი", "Hosted by")}{" "}
+            {t("ორგანიზატორი", "Hosted by")}{" "}
             {a.centerUserId ? (
               <Link to={`/centers/${a.centerUserId}`} onClick={onClose}>{a.centerName}</Link>
             ) : (
@@ -94,40 +94,25 @@ export default function EventDetailModal({
             )}
           </div>
 
-          <div className="fb-event-page-guests">
-            <div className="fb-event-facepile" aria-hidden="true">
-              {[0, 1, 2].slice(0, Math.min(3, Math.max(1, a.interestedCount))).map((i) => (
-                <span key={i} className={`fb-face fb-face-${(a.id + i) % 5}`}>
-                  {String.fromCharCode(65 + ((a.id + i) % 26))}
-                </span>
-              ))}
+          {a.interestedCount > 0 && (
+            <div className="fb-event-page-guests">
+              <div className="fb-event-guest-counts">
+                <b>{a.interestedCount} {t("მიდის", "going")}</b>
+              </div>
             </div>
-            <div className="fb-event-guest-counts">
-              <b>{a.interestedCount} {t("მიდის", "going")}</b>
-              <span>
-                {likes} {t("მოწონება", "likes")}
-                {interestedSoft ? ` · ${t("დაინტერესებული", "interested")}` : ""}
-              </span>
-            </div>
-          </div>
+          )}
 
           <div className="fb-event-actions fb-event-page-rsvp">
             {isDoctor && (
-              <button type="button" className={`fb-rsvp${a.isFavorite ? " active like" : ""}`} disabled={busyId === a.id} onClick={onLike}>
-                <ThumbUp size={16} filled={a.isFavorite} />
-                {t("მომწონს", "Like")}
-              </button>
-            )}
-            {isDoctor && (
-              <button type="button" className={`fb-rsvp${interestedSoft ? " active interested" : ""}`} disabled={busyId === a.id || going} onClick={onLike}>
-                <Star size={16} filled={interestedSoft} />
-                {t("დაინტერესებული", "Interested")}
-              </button>
-            )}
-            {isDoctor && (
               <button type="button" className={`fb-rsvp fb-rsvp-primary${going ? " active going" : ""}`} disabled={busyId === a.id} onClick={onGoing}>
                 <Check size={16} />
-                {t("მივდივარ", "Going")}
+                {going ? t("რეგისტრირებული", "Registered") : t("რეგისტრაცია", "Register")}
+              </button>
+            )}
+            {isDoctor && (
+              <button type="button" className={`fb-rsvp${a.isFavorite ? " active saved" : ""}`} disabled={busyId === a.id} onClick={onSave}>
+                <Bookmark size={16} filled={a.isFavorite} />
+                {a.isFavorite ? t("შენახული", "Saved") : t("შენახვა", "Save")}
               </button>
             )}
             {mineTab && a.hasGroupChat && (
@@ -150,12 +135,12 @@ export default function EventDetailModal({
                   </div>
                 </li>
                 <li>
-                  {a.format === "ონლაინ" ? <Mail size={18} /> : <Pin size={18} />}
+                  {online ? <Video size={18} /> : <Pin size={18} />}
                   <div>
                     <b>{placeLabel}</b>
                     <span>
-                      {a.format === "ონლაინ"
-                        ? t("ონლაინ ღონისძიება", "Online event")
+                      {online
+                        ? t("ონლაინ ტრენინგი", "Online training")
                         : t("დასწრებით", "In person")}
                     </span>
                   </div>
@@ -186,9 +171,18 @@ export default function EventDetailModal({
                     </div>
                   </li>
                 )}
+                {typeof a.seats === "number" && a.seats > 0 && (
+                  <li>
+                    <Cap size={18} />
+                    <div>
+                      <b>{a.seats}</b>
+                      <span>{t("ადგილების რაოდენობა", "Available seats")}</span>
+                    </div>
+                  </li>
+                )}
                 {a.language && (
                   <li>
-                    <Mail size={18} />
+                    <Calendar size={18} />
                     <div>
                       <b>{a.language}</b>
                       <span>{t("ენა", "Language")}</span>
@@ -206,7 +200,7 @@ export default function EventDetailModal({
                 )}
                 {a.category && (
                   <li>
-                    <Star size={18} />
+                    <Bookmark size={18} />
                     <div>
                       <b>{a.category}</b>
                       <span>{t("კატეგორია", "Category")}</span>
@@ -225,7 +219,7 @@ export default function EventDetailModal({
                 <p className="fb-event-about muted">{t("აღწერა ჯერ არ არის დამატებული.", "No description added yet.")}</p>
               )}
 
-              <h3 className="fb-event-host-title">{t("მასპინძელი", "Host")}</h3>
+              <h3 className="fb-event-host-title">{t("ორგანიზატორი", "Host")}</h3>
               <div className="fb-event-host-card">
                 <span className="fb-event-host-av">{hostInitial}</span>
                 <div>
