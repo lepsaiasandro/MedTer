@@ -283,7 +283,9 @@ public class AdminController : ControllerBase
                 a.City, a.Duration, a.Language, a.Points, a.Price, a.Seats, a.ImageUrl,
                 a.StartDate, a.RegistrationDeadline, a.Status, a.RejectionReason,
                 a.CenterUserId, a.Center!.DisplayName,
-                a.Interests.Count, false, false, a.CreatedAt))
+                a.Interests.Count, false, false, a.CreatedAt,
+                false,
+                a.MeetingAccess))
             .ToListAsync();
 
         return Ok(list);

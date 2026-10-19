@@ -44,7 +44,9 @@ public class AnnouncementsController : ControllerBase
                 a.Interests.Count,
                 a.Interests.Any(i => i.DoctorUserId == myId),
                 _db.Favorites.Any(f => f.AnnouncementId == a.Id && f.DoctorUserId == myId),
-                a.CreatedAt))
+                a.CreatedAt,
+                false,
+                a.Interests.Any(i => i.DoctorUserId == myId) ? a.MeetingAccess : null))
             .ToListAsync();
 
         return Ok(list);
@@ -66,7 +68,8 @@ public class AnnouncementsController : ControllerBase
                 a.StartDate, a.RegistrationDeadline, a.Status, a.RejectionReason,
                 a.CenterUserId, a.Center!.DisplayName,
                 a.Interests.Count, false, false, a.CreatedAt,
-                _db.ChatGroups.Any(g => g.AnnouncementId == a.Id)))
+                _db.ChatGroups.Any(g => g.AnnouncementId == a.Id),
+                a.MeetingAccess))
             .ToListAsync();
 
         return Ok(list);
@@ -94,7 +97,8 @@ public class AnnouncementsController : ControllerBase
                 true,
                 _db.Favorites.Any(f => f.AnnouncementId == i.AnnouncementId && f.DoctorUserId == myId),
                 i.Announcement.CreatedAt,
-                _db.ChatGroups.Any(g => g.AnnouncementId == i.AnnouncementId)))
+                _db.ChatGroups.Any(g => g.AnnouncementId == i.AnnouncementId),
+                i.Announcement.MeetingAccess))
             .ToListAsync();
 
         return Ok(list);
@@ -114,7 +118,9 @@ public class AnnouncementsController : ControllerBase
                 a.City, a.Duration, a.Language, a.Points, a.Price, a.Seats, a.ImageUrl,
                 a.StartDate, a.RegistrationDeadline, a.Status, a.RejectionReason,
                 a.CenterUserId, a.Center!.DisplayName,
-                a.Interests.Count, false, false, a.CreatedAt))
+                a.Interests.Count, false, false, a.CreatedAt,
+                false,
+                a.MeetingAccess))
             .ToListAsync();
 
         return Ok(list);
@@ -202,7 +208,7 @@ public class AnnouncementsController : ControllerBase
         {
             message = "Center Pro subscription required to publish trainings. You can still save drafts.",
             code = "subscription_required",
-            pricingPath = "/pricing"
+            pricingPath = "/profile#subscription"
         });
     }
 
@@ -216,6 +222,7 @@ public class AnnouncementsController : ControllerBase
         a.ShortDescription = dto.ShortDescription;
         a.Description = dto.Description;
         a.City = dto.City;
+        a.MeetingAccess = string.IsNullOrWhiteSpace(dto.MeetingAccess) ? null : dto.MeetingAccess.Trim();
         a.Duration = dto.Duration;
         a.Language = dto.Language;
         a.Points = dto.Points;
@@ -285,7 +292,12 @@ public class AnnouncementsController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
-        return Ok();
+        return Ok(new
+        {
+            meetingAccess = a.MeetingAccess,
+            city = a.City,
+            format = a.Format,
+        });
     }
 
     [HttpDelete("{id}/interest")]

@@ -4,6 +4,8 @@ import { usePrefs } from "../i18n";
 import { Check, Trash, List, Users, Cap, Bell, Clock, Plus, Edit, Image } from "../components/icons";
 import MediaPlaceholder from "../components/MediaPlaceholder";
 import { partnerLogoUrl } from "../partnerLogos";
+import { SearchField } from "../components/FilterBar";
+import { matchesSearch } from "../lib/search";
 
 interface Announcement {
   id: number;
@@ -405,13 +407,8 @@ export default function AdminDashboard() {
     );
   };
 
-  const matchesQuery = (q: string, values: Array<string | number | undefined | null>) => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return true;
-    return values
-      .filter((v) => v !== undefined && v !== null && String(v).trim() !== "")
-      .some((v) => String(v).toLowerCase().includes(needle));
-  };
+  const matchesQuery = (q: string, values: Array<string | number | undefined | null>) =>
+    matchesSearch(q, values);
 
   const filteredMembers = users.filter((u) =>
     matchesQuery(memberFilter, [u.displayName, u.email, u.city, u.specialty, u.phone, u.role, userStatus(u)])
@@ -696,18 +693,21 @@ export default function AdminDashboard() {
                   <h2>{t("წევრობის მოთხოვნები", "Member requests")}</h2>
                   <p>{t("ადამიანები, რომლებიც ითხოვენ MedTer-ზე გაწევრიანებას", "People who asked to join MedTer")}</p>
                 </div>
-                <input
-                  className="control admin-search"
+                <SearchField
+                  size="compact"
                   value={queueSearch}
-                  onChange={(e) => setQueueSearch(e.target.value)}
+                  onChange={setQueueSearch}
                   placeholder={t("ძიება სახელით, ელფოსტით…", "Search by name, email…")}
+                  aria-label={t("მოთხოვნების ძებნა", "Search requests")}
                 />
               </div>
               {pendingUsers.length === 0
                 ? empty(t("მოთხოვნები არ არის", "No requests"), t("ახალი რეგისტრაციები აქ გამოჩნდება.", "New registrations will appear here."), <Users size={42} />)
                 : filteredPendingUsers.length === 0
                   ? empty(t("შედეგი არ მოიძებნა", "No matches"), t("შეცვალე ძიების ტექსტი.", "Try a different search."), <Users size={42} />)
-                  : <div className="admin-queue">{filteredPendingUsers.map(memberRequestCard)}</div>}
+                  : (
+                    <div className="admin-queue">{filteredPendingUsers.map(memberRequestCard)}</div>
+                  )}
             </>
           )}
 
@@ -718,18 +718,21 @@ export default function AdminDashboard() {
                   <h2>{t("პროფილის ცვლილებები", "Profile changes")}</h2>
                   <p>{t("მომხმარებლების მიერ მოთხოვნილი ინფორმაციის განახლებები", "User-requested profile information updates")}</p>
                 </div>
-                <input
-                  className="control admin-search"
+                <SearchField
+                  size="compact"
                   value={queueSearch}
-                  onChange={(e) => setQueueSearch(e.target.value)}
+                  onChange={setQueueSearch}
                   placeholder={t("ძიება სახელით, ელფოსტით…", "Search by name, email…")}
+                  aria-label={t("ცვლილებების ძებნა", "Search changes")}
                 />
               </div>
               {profileChanges.length === 0
                 ? empty(t("ცვლილებები არ არის", "No changes"), t("პროფილის განახლებები აქ გამოჩნდება.", "Profile updates will appear here."), <Users size={42} />)
                 : filteredProfileChanges.length === 0
                   ? empty(t("შედეგი არ მოიძებნა", "No matches"), t("შეცვალე ძიების ტექსტი.", "Try a different search."), <Users size={42} />)
-                  : <div className="admin-queue">{filteredProfileChanges.map(profileChangeCard)}</div>}
+                  : (
+                    <div className="admin-queue">{filteredProfileChanges.map(profileChangeCard)}</div>
+                  )}
             </>
           )}
 
@@ -740,18 +743,21 @@ export default function AdminDashboard() {
                   <h2>{t("პოსტების დამტკიცება", "Post approvals")}</h2>
                   <p>{t("ტრენინგ ცენტრების განცხადებები, რომლებიც ელოდება გამოქვეყნებას", "Training center posts waiting to go live")}</p>
                 </div>
-                <input
-                  className="control admin-search"
+                <SearchField
+                  size="compact"
                   value={queueSearch}
-                  onChange={(e) => setQueueSearch(e.target.value)}
+                  onChange={setQueueSearch}
                   placeholder={t("ძიება სათაურით, ცენტრით…", "Search by title, center…")}
+                  aria-label={t("პოსტების ძებნა", "Search posts")}
                 />
               </div>
               {pendingTrainings.length === 0
                 ? empty(t("ყველაფერი განხილულია", "All reviewed"), t("დასამტკიცებელი ტრენინგი არ არის.", "No trainings waiting for approval."), <Check size={42} />)
                 : filteredPendingTrainings.length === 0
                   ? empty(t("შედეგი არ მოიძებნა", "No matches"), t("შეცვალე ძიების ტექსტი.", "Try a different search."), <Cap size={42} />)
-                  : <div className="admin-queue">{filteredPendingTrainings.map((a) => postApprovalCard(a))}</div>}
+                  : (
+                    <div className="admin-queue">{filteredPendingTrainings.map((a) => postApprovalCard(a))}</div>
+                  )}
             </>
           )}
 
@@ -762,11 +768,12 @@ export default function AdminDashboard() {
                   <h2>{t("წევრები", "Members")}</h2>
                   <p>{t("ყველა ექიმი და ტრენინგ ცენტრი", "All doctors and training centers")}</p>
                 </div>
-                <input
-                  className="control admin-search"
+                <SearchField
+                  size="compact"
                   value={memberFilter}
-                  onChange={(e) => setMemberFilter(e.target.value)}
+                  onChange={setMemberFilter}
                   placeholder={t("ძიება სახელით, ელფოსტით…", "Search by name, email…")}
+                  aria-label={t("წევრების ძებნა", "Search members")}
                 />
               </div>
               {filteredMembers.length === 0
@@ -846,11 +853,12 @@ export default function AdminDashboard() {
                   <p>{t("ყველა ტრენინგი — სტატუსი, თარიღი და დრო", "All trainings — status, date and time")}</p>
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "flex-end" }}>
-                  <input
-                    className="control admin-search"
+                  <SearchField
+                    size="compact"
                     value={contentSearch}
-                    onChange={(e) => setContentSearch(e.target.value)}
+                    onChange={setContentSearch}
                     placeholder={t("ძიება სათაურით, ცენტრით…", "Search by title, center…")}
+                    aria-label={t("კონტენტის ძებნა", "Search content")}
                   />
                   <div className="role-toggle admin-filter-toggle">
                     {(["all", "Pending", "Published", "Rejected", "Draft"] as const).map((f) => (
@@ -865,7 +873,9 @@ export default function AdminDashboard() {
                 ? empty(t("კონტენტი არ არის", "No content"), t("ტრენინგები აქ გამოჩნდება.", "Trainings will appear here."), <Cap size={42} />)
                 : filteredContent.length === 0
                   ? empty(t("შედეგი არ მოიძებნა", "No matches"), t("შეცვალე ძიება ან ფილტრი.", "Try another search or filter."), <Cap size={42} />)
-                  : <div className="admin-queue">{filteredContent.map((a) => postApprovalCard(a))}</div>}
+                  : (
+                    <div className="admin-queue">{filteredContent.map((a) => postApprovalCard(a))}</div>
+                  )}
             </>
           )}
 

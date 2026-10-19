@@ -13,7 +13,11 @@ public class Announcement
     // Details & schedule
     public string? ShortDescription { get; set; }
     public string? Description { get; set; }
-    public string? City { get; set; }            // location / venue
+    public string? City { get; set; }            // public city / region label
+    /// <summary>
+    /// Zoom/Meet link or exact venue address — shown only to registered doctors (and the owning center).
+    /// </summary>
+    public string? MeetingAccess { get; set; }
     public string? Duration { get; set; }        // e.g. "6 საათი / 2 დღე"
     public string? Language { get; set; }
     public DateTime? StartDate { get; set; }

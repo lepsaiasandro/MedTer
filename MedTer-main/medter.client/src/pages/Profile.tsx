@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
+import CenterSubscription from "../components/CenterSubscription";
 import { Calendar, Cap, Check, Doc, Mail, Pin, Trophy, Users } from "../components/icons";
 
 interface ProfileCertificate {
@@ -108,6 +109,13 @@ export default function Profile() {
   useEffect(() => {
     load().finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (loading || !profile || profile.role !== "TrainingCenter") return;
+    if (window.location.hash !== "#subscription") return;
+    const el = document.getElementById("subscription");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [loading, profile]);
 
   const fmtDate = (iso?: string) => {
     if (!iso) return "—";
@@ -232,7 +240,7 @@ export default function Profile() {
   const canEdit = (isDoctor || isCenter) && profile.isApproved;
   const points = profile.totalPoints;
   const pct = Math.min(100, Math.round((points / GOAL) * 100));
-  const r = 52;
+  const r = 58;
   const circ = 2 * Math.PI * r;
   const offset = circ - (pct / 100) * circ;
   const initial = profile.displayName.charAt(0);
@@ -463,23 +471,25 @@ export default function Profile() {
               </div>
 
               <div className="card" style={{ padding: 20 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 12, flexWrap: "wrap" }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>{t("სერტიფიკატები", "Certificates")}</h3>
-                  <Link to="/certificates" className="btn btn-ghost btn-sm">{t("ყველას ნახვა", "View all")}</Link>
-                </div>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: "0 0 14px" }}>{t("ჩემი სერტიფიკატები", "My Certificates")}</h3>
                 {profile.certificates.length === 0 ? (
                   <p style={{ fontSize: 13.5, color: "var(--soft)", margin: 0 }}>
                     {t("ჯერ არ გაქვს სერტიფიკატი — ტრენინგების გავლის შემდეგ აქ გამოჩნდება.", "No certificates yet — they appear here after trainings.")}
                   </p>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {profile.certificates.slice(0, 8).map((c) => (
+                    {profile.certificates.map((c) => (
                       <div key={c.id} className="cert" style={{ alignItems: "flex-start" }}>
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ fontWeight: 650, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
                           <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3, display: "flex", flexWrap: "wrap", gap: 8 }}>
                             <span>{c.centerName}</span>
                             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Calendar size={12} /> {fmtDate(c.issuedAt)}</span>
+                            {c.fileUrl && (
+                              <a href={c.fileUrl} target="_blank" rel="noreferrer" style={{ color: "var(--brand)" }}>
+                                {t("ფაილი", "File")}
+                              </a>
+                            )}
                           </div>
                         </div>
                         <span className="plus">+{c.points}</span>
@@ -507,10 +517,11 @@ export default function Profile() {
                   <div className="v">{profile.ratingCount ? profile.averageRating.toFixed(1) : "—"}</div>
                 </div>
               </div>
+              <CenterSubscription />
               <div className="card" style={{ padding: 20 }}>
                 <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>{t("სწრაფი ბმულები", "Quick links")}</h3>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                  <Link to="/my-announcements" className="btn btn-primary btn-sm">{t("ჩემი განცხადებები", "My Announcements")}</Link>
+                  <Link to="/dashboard" className="btn btn-primary btn-sm">{t("დაფა", "Dashboard")}</Link>
                   <Link to="/announcements" className="btn btn-ghost btn-sm">{t("ტრენინგები", "Trainings")}</Link>
                   <Link to="/chat" className="btn btn-ghost btn-sm">{t("შეტყობინებები", "Messages")}</Link>
                 </div>
@@ -536,13 +547,13 @@ export default function Profile() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {isDoctor && (
-            <div className="card" style={{ padding: 20 }}>
+            <div className="ring-card">
               <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 16 }}>{t("ჩემი პროგრესი", "My Progress")}</h3>
               <div className="ring-wrap">
-                <div className="ring">
-                  <svg width="150" height="150" viewBox="0 0 120 120" style={{ transform: "rotate(-90deg)" }}>
-                    <circle cx="60" cy="60" r={r} fill="none" stroke="var(--border)" strokeWidth="10" />
-                    <circle cx="60" cy="60" r={r} fill="none" stroke="var(--teal)" strokeWidth="10" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} />
+                <div className="progress-ring">
+                  <svg width="150" height="150" viewBox="0 0 150 150" style={{ transform: "rotate(-90deg)", border: "none", outline: "none" }}>
+                    <circle cx="75" cy="75" r={r} fill="none" stroke="var(--border)" strokeWidth="10" />
+                    <circle cx="75" cy="75" r={r} fill="none" stroke="var(--teal)" strokeWidth="10" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} />
                   </svg>
                   <div className="center">
                     <div>

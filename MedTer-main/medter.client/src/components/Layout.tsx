@@ -17,27 +17,33 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   const isGuest = !user;
   const isCenter = user?.role === "TrainingCenter";
-  const isDoctor = user?.role === "Doctor";
   const isAdmin = user?.role === "Admin";
   const roleLabel = isCenter ? t("ტრენინგ ცენტრი", "Training Center") : isAdmin ? t("ადმინისტრატორი", "Administrator") : t("ექიმი", "Doctor");
   const initial = user?.displayName?.charAt(0) ?? "?";
 
-  const nav = isGuest
+  type NavItem = { to: string; label: string; full?: string };
+  const nav: NavItem[] = isGuest
     ? [
         { to: "/", label: t("მთავარი", "Home") },
-        { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers") },
+        { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
+        { to: "/#audience", label: t("ვისთვისაა", "Audience"), full: t("ვისთვისაა", "Who it's for") },
+        { to: "/#contact", label: t("კონტაქტი", "Contact") },
       ]
     : isAdmin
-      ? [{ to: "/", label: t("ადმინ პანელი", "Admin Panel") }, { to: "/announcements", label: t("ტრენინგები", "Trainings") }]
+      ? [
+          { to: "/", label: t("ადმინი", "Admin"), full: t("ადმინ პანელი", "Admin Panel") },
+          { to: "/announcements", label: t("ტრენინგები", "Trainings") },
+          { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
+          { to: "/profile", label: t("პროფილი", "Profile") },
+        ]
       : [
           { to: "/", label: t("მთავარი", "Home") },
-          { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers") },
           { to: "/announcements", label: t("ტრენინგები", "Trainings") },
+          { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
           ...(isCenter ? [
-            { to: "/my-announcements", label: t("ჩემი განცხადებები", "My Announcements") },
-            { to: "/pricing", label: t("გამოწერა", "Pricing") },
+            { to: "/dashboard", label: t("დაფა", "Dashboard") },
           ] : []),
-          ...(isDoctor ? [{ to: "/certificates", label: t("ჩემი სერტიფიკატები", "My Certificates") }] : []),
+          { to: "/profile", label: t("პროფილი", "Profile") },
         ];
 
   const [unreadMsgs, setUnreadMsgs] = useState(0);
@@ -172,8 +178,8 @@ export default function Layout({ children }: { children: ReactNode }) {
       ]
     : [
         { to: "/", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
-        { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
         { to: "/announcements", label: t("ტრენინგები", "Trainings"), icon: <Cap size={16} /> },
+        { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
         { to: "/chat", label: t("შეტყობინებები", "Messages"), icon: <Chat size={16} /> },
       ];
   return (
@@ -192,19 +198,31 @@ export default function Layout({ children }: { children: ReactNode }) {
 
           <Link to="/" className="logo" onClick={() => setNavOpen(false)}>
             <img src={logoIcon} alt="" className="logo-mark-img" />
-            <span>
-              <div className="logo-name">Med<span>Ter</span></div>
-              <div className="logo-tag">CONNECT · DISCUSS · ADVANCE</div>
-            </span>
+            <span className="logo-name">Med<span>Ter</span>.ge</span>
           </Link>
 
           <nav className="nav" aria-label={t("ძირითადი ნავიგაცია", "Main navigation")}>
             {nav.map((item) => {
+              const hash = item.to.includes("#") ? item.to.split("#")[1] : "";
               const active = item.to === "/centers"
                 ? location.pathname === "/centers" || location.pathname.startsWith("/centers/")
-                : location.pathname === item.to;
+                : hash
+                  ? location.pathname === "/" && location.hash === `#${hash}`
+                  : location.pathname === item.to && !location.hash;
               return (
-                <Link key={item.to} to={item.to} className={active ? "active" : ""}>{item.label}</Link>
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={active ? "active" : ""}
+                  onClick={() => {
+                    if (!hash || location.pathname !== "/") return;
+                    requestAnimationFrame(() => {
+                      document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    });
+                  }}
+                >
+                  {item.label}
+                </Link>
               );
             })}
           </nav>
@@ -265,11 +283,11 @@ export default function Layout({ children }: { children: ReactNode }) {
                     <button type="button" className="dropdown-dismiss" aria-label={t("დახურვა", "Close")} onClick={() => setMenuOpen(false)} />
                     <div className="dropdown">
                       <Link to="/profile" className="dd-item" onClick={() => setMenuOpen(false)}>
-                        {t("ჩემი პროფილი", "My Profile")}
+                        {t("პროფილი", "Profile")}
                       </Link>
-                      {isDoctor && (
-                        <Link to="/certificates" className="dd-item" onClick={() => setMenuOpen(false)}>
-                          {t("სერტიფიკატები", "Certificates")}
+                      {isCenter && (
+                        <Link to="/dashboard" className="dd-item" onClick={() => setMenuOpen(false)}>
+                          {t("დაფა", "Dashboard")}
                         </Link>
                       )}
                       <button className="dd-item" onClick={doLogout}>{t("გასვლა", "Log out")}</button>
@@ -278,13 +296,16 @@ export default function Layout({ children }: { children: ReactNode }) {
                 )}
               </div>
             ) : (
-              <div style={{ position: "relative" }}>
+              <div className="guest-auth-actions" style={{ position: "relative", display: "flex", alignItems: "center", gap: 8 }}>
                 <button
-                  className="btn btn-primary btn-sm"
+                  className="btn btn-text btn-sm"
                   onClick={() => { setLoginOpen((o) => !o); setLoginError(""); }}
                 >
                   {t("შესვლა", "Sign in")}
                 </button>
+                <Link to="/register" className="btn btn-primary btn-sm">
+                  {t("რეგისტრაცია", "Register")}
+                </Link>
                 {loginOpen && (
                   <>
                     <button type="button" className="dropdown-dismiss" aria-label={t("დახურვა", "Close")} onClick={() => setLoginOpen(false)} />
@@ -354,12 +375,26 @@ export default function Layout({ children }: { children: ReactNode }) {
           </button>
         </div>
         {nav.map((item) => {
+          const hash = item.to.includes("#") ? item.to.split("#")[1] : "";
           const active = item.to === "/centers"
             ? location.pathname === "/centers" || location.pathname.startsWith("/centers/")
-            : location.pathname === item.to;
+            : hash
+              ? location.pathname === "/" && location.hash === `#${hash}`
+              : location.pathname === item.to && !location.hash;
           return (
-            <Link key={item.to} to={item.to} className={active ? "active" : ""} onClick={() => setNavOpen(false)}>
-              {item.label}
+            <Link
+              key={item.to}
+              to={item.to}
+              className={active ? "active" : ""}
+              onClick={() => {
+                setNavOpen(false);
+                if (!hash || location.pathname !== "/") return;
+                requestAnimationFrame(() => {
+                  document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                });
+              }}
+            >
+              {item.full ?? item.label}
             </Link>
           );
         })}
@@ -383,10 +418,6 @@ export default function Layout({ children }: { children: ReactNode }) {
                   ? <div className="dd-empty">{t("ცარიელია", "Empty")}</div>
                   : notifs.map((n) => <div key={n.id} className="dd-item">{n.text}</div>)}
               </div>
-            )}
-            <Link to="/profile" onClick={() => setNavOpen(false)}>{t("ჩემი პროფილი", "My Profile")}</Link>
-            {isDoctor && (
-              <Link to="/certificates" onClick={() => setNavOpen(false)}>{t("სერტიფიკატები", "Certificates")}</Link>
             )}
             <button type="button" className="mobile-nav-action" onClick={() => { setNavOpen(false); doLogout(); }}>
               {t("გასვლა", "Log out")}

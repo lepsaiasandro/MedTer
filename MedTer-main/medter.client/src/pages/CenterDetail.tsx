@@ -2,20 +2,21 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
-import { ArrowLeft, Pin, Calendar, Mail, Check, Bookmark, Cap } from "../components/icons";
+import { ArrowLeft, Pin, Calendar, Mail, Check, Bookmark, Cap, ExternalLink, Phone } from "../components/icons";
 import { StarsView, StarsInput } from "../components/Stars";
 import ShareMenu from "../components/ShareMenu";
-import MediaPlaceholder from "../components/MediaPlaceholder";
 import EmptyState from "../components/EmptyState";
 import { usePrefs } from "../i18n";
+import { pickCardBanner } from "../lib/cardBanners";
 
 interface TrainingCenter {
   userId: string; name: string; description?: string; city?: string; phone?: string;
   averageRating: number; ratingCount: number; myRating?: number;
+  announcementCount?: number; upcomingCount?: number; categories?: string[];
 }
 interface Announcement {
   id: number; title: string; category?: string; format?: string; description?: string;
-  city?: string; points: number; startDate?: string; imageUrl?: string;
+  city?: string; meetingAccess?: string; points: number; startDate?: string; imageUrl?: string;
   centerUserId: string; isInterested: boolean; interestedCount: number; isFavorite: boolean;
 }
 
@@ -45,7 +46,7 @@ export default function CenterDetail() {
   const toggleInterest = async (a: Announcement) => {
     if (a.isInterested) await api.delete(`/announcements/${a.id}/interest`);
     else await api.post(`/announcements/${a.id}/interest`);
-    load();
+    await load();
   };
   const toggleFav = async (a: Announcement) => {
     if (a.isFavorite) await api.delete(`/announcements/${a.id}/favorite`);
@@ -85,14 +86,36 @@ export default function CenterDetail() {
               {center.city && <span className="trust-chip"><Pin size={12} /> {center.city}</span>}
             </div>
             <h1 style={{ fontSize: "clamp(1.15rem, 1rem + 1vw, 1.4rem)", fontWeight: 800, color: "var(--text)", lineHeight: 1.3 }}>{center.name}</h1>
-            <div className="meta" style={{ marginTop: 6 }}>
-              <div className="row" style={{ flexWrap: "wrap" }}>
-                {center.phone && <span>{center.phone}</span>}
+            <div className="meta" style={{ marginTop: 8, gap: 8 }}>
+              {center.phone && (
+                <div className="row">
+                  <Phone size={15} />
+                  <a href={`tel:${center.phone.replace(/\s+/g, "")}`} style={{ color: "inherit" }}>{center.phone}</a>
+                </div>
+              )}
+              <div className="row">
+                <Cap size={15} />
+                {t(`${center.announcementCount ?? items.length} ტრენინგი`, `${center.announcementCount ?? items.length} trainings`)}
+                {(center.upcomingCount ?? 0) > 0 && (
+                  <span style={{ color: "var(--soft)" }}>
+                    · {t(`${center.upcomingCount} მოახლოებული`, `${center.upcomingCount} upcoming`)}
+                  </span>
+                )}
               </div>
             </div>
           </div>
         </div>
-        {center.description && <p style={{ color: "var(--text-body)", marginTop: 16, fontSize: 14 }}>{center.description}</p>}
+        {center.description
+          ? <p style={{ color: "var(--text-body)", marginTop: 16, fontSize: 14, lineHeight: 1.55 }}>{center.description}</p>
+          : <p style={{ color: "var(--soft)", marginTop: 16, fontSize: 14 }}>{t("აღწერა ჯერ არ არის დამატებული.", "No description added yet.")}</p>}
+
+        {(center.categories?.length ?? 0) > 0 && (
+          <div className="center-cat-row" style={{ marginTop: 14 }}>
+            {center.categories!.map((cat) => (
+              <span key={cat} className="chip-cat">{cat}</span>
+            ))}
+          </div>
+        )}
 
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
           <div>
@@ -118,21 +141,23 @@ export default function CenterDetail() {
       ) : (
         <div className="grid">
           {items.map((a, i) => (
-            <article key={a.id} className="card card-interactive reveal" style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}>
-              <div className="media pv-media">
-                {a.imageUrl
-                  ? <img src={a.imageUrl} alt="" />
-                  : <MediaPlaceholder title={a.title} variant="teal" />}
-                <span className="badge-points"><span className="tealdot" /> {a.points} {t("ქულა", "pts")}</span>
-                {isDoctor && (
-                  <button className="act" title={t("რჩეულებში დამატება", "Add to favorites")}
-                    style={{ position: "absolute", top: 8, right: 8, background: "rgba(255,255,255,.92)", color: a.isFavorite ? "var(--brand)" : "var(--muted)" }}
-                    onClick={() => toggleFav(a)}>
-                    <Bookmark size={16} filled={a.isFavorite} />
-                  </button>
-                )}
+            <article key={a.id} className="card card--banner card-interactive reveal" style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}>
+              <div className="card-banner-bg" aria-hidden="true">
+                <img src={pickCardBanner(a.id, a.imageUrl)} alt="" loading="lazy" />
               </div>
+              {isDoctor && (
+                <button
+                  type="button"
+                  className="act card-banner-fav"
+                  title={t("რჩეულებში დამატება", "Add to favorites")}
+                  style={{ color: a.isFavorite ? "var(--brand)" : "var(--muted)" }}
+                  onClick={() => toggleFav(a)}
+                >
+                  <Bookmark size={16} filled={a.isFavorite} />
+                </button>
+              )}
               <div className="body">
+                <span className="badge-points"><span className="tealdot" /> {a.points} {t("ქულა", "pts")}</span>
                 {a.category && <span className="chip-cat">{a.category}</span>}
                 <h3>{a.title}</h3>
                 <div className="meta">
@@ -142,8 +167,25 @@ export default function CenterDetail() {
                     {a.format === "ონლაინ" ? t("ონლაინ კურსი", "Online course") : `${a.city ? a.city + " · " : ""}${t("დასწრებით", "In person")}`}
                   </div>
                 </div>
+                {a.isInterested && (a.meetingAccess || a.city) && (
+                  <div className="meeting-access">
+                    {a.format === "ონლაინ" || /^https?:\/\//i.test(a.meetingAccess || "")
+                      ? <ExternalLink size={15} />
+                      : <Pin size={15} />}
+                    <div>
+                      <span>
+                        {a.format === "ონლაინ" || /^https?:\/\//i.test(a.meetingAccess || "")
+                          ? t("შეხვედრის ლინკი", "Meeting link")
+                          : t("ლოკაცია", "Location")}
+                      </span>
+                      {/^https?:\/\//i.test((a.meetingAccess || "").trim())
+                        ? <a href={a.meetingAccess!.trim()} target="_blank" rel="noopener noreferrer">{a.meetingAccess}</a>
+                        : <b>{a.meetingAccess || a.city}</b>}
+                    </div>
+                  </div>
+                )}
                 <div className="foot">
-                  <span style={{ fontSize: 12.5, color: "var(--muted)" }}>{a.interestedCount} {t("დაინტერესდა", "interested")}</span>
+                  <span style={{ fontSize: 12.5, color: "rgba(255,255,255,.85)" }}>{a.interestedCount} {t("დაინტერესდა", "interested")}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <ShareMenu title={a.title} />
                     {isDoctor && (

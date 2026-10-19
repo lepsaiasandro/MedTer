@@ -3,7 +3,10 @@ import { Link, useSearchParams } from "react-router-dom";
 import api from "../api";
 import ShareMenu from "../components/ShareMenu";
 import { usePrefs } from "../i18n";
-import { Check, X } from "../components/icons";
+import { Check, X, Search } from "../components/icons";
+import { FilterBar, SearchField, FilterChips, ResultMeta, type FilterChip } from "../components/FilterBar";
+import { matchesSearch } from "../lib/search";
+import EmptyState from "../components/EmptyState";
 
 /* ── types ──────────────────────────────────────────────────────────── */
 interface Announcement {
@@ -23,6 +26,7 @@ interface Announcement {
   imageUrl?: string;
   startDate?: string;
   registrationDeadline?: string;
+  meetingAccess?: string;
   status: string;
   rejectionReason?: string;
   interestedCount: number;
@@ -50,6 +54,7 @@ interface FormState {
   startDate: string;
   duration: string;
   city: string;
+  meetingAccess: string;
   language: string;
   points: string;
   price: string;
@@ -68,6 +73,7 @@ const emptyForm: FormState = {
   startDate: "",
   duration: "",
   city: "",
+  meetingAccess: "",
   language: "ქართული",
   points: "",
   price: "",
@@ -197,9 +203,20 @@ export default function MyAnnouncements() {
 
   const visible = items.filter((a) => {
     if (filter !== "all" && a.status !== filter) return false;
-    if (search && !a.title.toLowerCase().includes(search.toLowerCase())) return false;
+    if (!matchesSearch(search, [a.title, a.category, a.type, a.city, a.format, a.shortDescription, a.description])) return false;
     return true;
   });
+
+  const hasFilters = Boolean(search || filter !== "all");
+  const clearFilters = () => { setSearch(""); setFilter("all"); };
+  const activeChips: FilterChip[] = [
+    search ? { id: "q", label: `\u201C${search.trim()}\u201D`, onClear: () => setSearch("") } : null,
+    filter !== "all" ? {
+      id: "status",
+      label: t(STATUS_META[filter]?.ka ?? filter, STATUS_META[filter]?.en ?? filter),
+      onClear: () => setFilter("all"),
+    } : null,
+  ].filter(Boolean) as FilterChip[];
 
   /* ── form actions ── */
   const openCreate = () => { setForm(emptyForm); setView("form"); window.scrollTo(0, 0); };
@@ -215,6 +232,7 @@ export default function MyAnnouncements() {
       startDate: a.startDate ? a.startDate.slice(0, 10) : "",
       duration: a.duration || "",
       city: a.city || "",
+      meetingAccess: a.meetingAccess || "",
       language: a.language || "ქართული",
       points: a.points ? String(a.points) : "",
       price: a.price ? String(a.price) : "",
@@ -236,6 +254,7 @@ export default function MyAnnouncements() {
       shortDescription: form.shortDescription || null,
       description: form.description || null,
       city: form.city || null,
+      meetingAccess: form.meetingAccess || null,
       duration: form.duration || null,
       language: form.language || null,
       points: Number(form.points) || 0,
@@ -258,9 +277,9 @@ export default function MyAnnouncements() {
         const go = confirm(
           (data.data?.message || t("გამოქვეყნებისთვის საჭიროა Center Pro.", "Center Pro is required to publish."))
           + "\n\n"
-          + t("გახსნა Pricing გვერდი?", "Open the Pricing page?")
+          + t("გახსნა პროფილის გამოწერა?", "Open subscription in profile?")
         );
-        if (go) window.location.href = "/pricing";
+        if (go) window.location.href = "/profile#subscription";
         return;
       }
       alert(data?.data?.message || t("შენახვა ვერ მოხერხდა", "Save failed"));
@@ -322,7 +341,7 @@ export default function MyAnnouncements() {
       <div>
         <a className="back-link" onClick={() => setView("list")}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-          {t("ჩემი განცხადებები", "My Announcements")}
+          {t("დაფა", "Dashboard")}
         </a>
 
         <div className="page-head">
@@ -414,9 +433,10 @@ export default function MyAnnouncements() {
               </div>
               <div className="field-grid">
                 <div className="field" style={{ marginBottom: 0 }}>
-                  <label>{t("მდებარეობა", "Location")}</label>
-                  <input className="control" placeholder={t("მაგ: თბილისი, Radisson Blu — ან „ონლაინ, Zoom“", "e.g. Tbilisi, Radisson Blu — or 'online, Zoom'")}
+                  <label>{t("ქალაქი", "City")}</label>
+                  <input className="control" placeholder={t("მაგ: თბილისი", "e.g. Tbilisi")}
                     value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                  <div className="hint">{t("საჯაროდ ჩანს ბარათზე", "Shown publicly on the card")}</div>
                 </div>
                 <div className="field" style={{ marginBottom: 0 }}>
                   <label>{t("ენა", "Language")}</label>
@@ -425,6 +445,29 @@ export default function MyAnnouncements() {
                     <option>ინგლისური</option>
                     <option>ქართული / ინგლისური</option>
                   </select>
+                </div>
+              </div>
+              <div className="field" style={{ marginTop: 14, marginBottom: 0 }}>
+                <label>
+                  {form.format === "ონლაინ"
+                    ? t("შეხვედრის ლინკი", "Meeting link")
+                    : t("ზუსტი მისამართი / ლოკაცია", "Exact address / location")}
+                </label>
+                <input
+                  className="control"
+                  placeholder={
+                    form.format === "ონლაინ"
+                      ? t("მაგ: https://zoom.us/j/… ან Google Meet ლინკი", "e.g. https://zoom.us/j/… or Google Meet link")
+                      : t("მაგ: თბილისი, რადისონ ბლუ, მე-2 სართული", "e.g. Tbilisi, Radisson Blu, 2nd floor")
+                  }
+                  value={form.meetingAccess}
+                  onChange={(e) => setForm({ ...form, meetingAccess: e.target.value })}
+                />
+                <div className="hint">
+                  {t(
+                    "მხოლოდ დარეგისტრირებულ ექიმებს გამოჩნდება რეგისტრაციის შემდეგ",
+                    "Only registered doctors see this after they register"
+                  )}
                 </div>
               </div>
             </div>
@@ -566,14 +609,14 @@ export default function MyAnnouncements() {
             fontSize: 14, color: "var(--text)",
           }}>
             <span>{t("გამოქვეყნებისთვის საჭიროა Center Pro. Draft უფასოა.", "Center Pro is required to publish. Drafts are free.")}</span>
-            <Link to="/pricing" className="btn btn-primary" style={{ textDecoration: "none" }}>
-              {t("გამოწერა", "Pricing")}
+            <Link to="/profile#subscription" className="btn btn-primary" style={{ textDecoration: "none" }}>
+              {t("გამოწერა", "Subscription")}
             </Link>
           </div>
         )}
         <div className="page-head">
           <div className="h-text">
-            <h1>{t("ჩემი განცხადებები", "My Announcements")}</h1>
+            <h1>{t("დაფა", "Dashboard")}</h1>
             <p>{t("მართე შენი კონფერენციები და ტრენინგები, თვალი ადევნე რეგისტრაციებს", "Manage your conferences and trainings, track registrations")}</p>
           </div>
         </div>
@@ -597,8 +640,8 @@ export default function MyAnnouncements() {
       fontSize: 14, color: "var(--text)",
     }}>
       <span>{t("გამოქვეყნებისთვის საჭიროა Center Pro. Draft უფასოა.", "Center Pro is required to publish. Drafts are free.")}</span>
-      <Link to="/pricing" className="btn btn-primary" style={{ textDecoration: "none" }}>
-        {t("გამოწერა", "Pricing")}
+      <Link to="/profile#subscription" className="btn btn-primary" style={{ textDecoration: "none" }}>
+        {t("გამოწერა", "Subscription")}
       </Link>
     </div>
   ) : null;
@@ -610,7 +653,7 @@ export default function MyAnnouncements() {
       {subBanner}
       <div className="page-head">
         <div className="h-text">
-          <h1>{t("ჩემი განცხადებები", "My Announcements")}</h1>
+          <h1>{t("დაფა", "Dashboard")}</h1>
           <p>{t("მართე შენი კონფერენციები და ტრენინგები, თვალი ადევნე რეგისტრაციებს", "Manage your conferences and trainings, track registrations")}</p>
         </div>
         <div className="spacer" />
@@ -637,30 +680,57 @@ export default function MyAnnouncements() {
         </div>
       </div>
 
-      {/* toolbar */}
-      <div className="toolbar">
-        <div className="segment">
-          <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>{t("ყველა", "All")} <span className="count">{stats.total}</span></button>
-          <button className={filter === "Published" ? "active" : ""} onClick={() => setFilter("Published")}>{t("გამოქვეყნებული", "Published")} <span className="count">{stats.published}</span></button>
-          <button className={filter === "Pending" ? "active" : ""} onClick={() => setFilter("Pending")}>{t("განხილვაში", "Pending")} <span className="count">{stats.pending}</span></button>
-          <button className={filter === "Draft" ? "active" : ""} onClick={() => setFilter("Draft")}>{t("მონახაზი", "Draft")} <span className="count">{stats.draft}</span></button>
-          {stats.rejected > 0 && <button className={filter === "Rejected" ? "active" : ""} onClick={() => setFilter("Rejected")}>{t("უარყოფილი", "Rejected")} <span className="count">{stats.rejected}</span></button>}
-        </div>
-        <div className="search">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
-          <input placeholder={t("ძებნა სათაურით…", "Search by title…")} value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
+      <div className="segment" style={{ marginBottom: 14 }}>
+        <button type="button" className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>{t("ყველა", "All")} <span className="count">{stats.total}</span></button>
+        <button type="button" className={filter === "Published" ? "active" : ""} onClick={() => setFilter("Published")}>{t("გამოქვეყნებული", "Published")} <span className="count">{stats.published}</span></button>
+        <button type="button" className={filter === "Pending" ? "active" : ""} onClick={() => setFilter("Pending")}>{t("განხილვაში", "Pending")} <span className="count">{stats.pending}</span></button>
+        <button type="button" className={filter === "Draft" ? "active" : ""} onClick={() => setFilter("Draft")}>{t("მონახაზი", "Draft")} <span className="count">{stats.draft}</span></button>
+        {stats.rejected > 0 && <button type="button" className={filter === "Rejected" ? "active" : ""} onClick={() => setFilter("Rejected")}>{t("უარყოფილი", "Rejected")} <span className="count">{stats.rejected}</span></button>}
       </div>
 
-      {/* cards */}
+      <FilterBar
+        search={
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            placeholder={t("ძებნა სათაურით, კატეგორიით…", "Search by title, category…")}
+            aria-label={t("განცხადებების ძებნა", "Search announcements")}
+          />
+        }
+        chips={
+          <FilterChips
+            chips={activeChips}
+            clearLabel={t("გასუფთავება", "Clear")}
+            onClearAll={clearFilters}
+          />
+        }
+        meta={
+          <ResultMeta
+            shown={visible.length}
+            total={items.length}
+            hasFilters={hasFilters}
+            label={(shown, total) =>
+              hasFilters
+                ? t(`${shown} / ${total} შედეგი`, `${shown} of ${total} results`)
+                : t(`${total} განცხადება`, `${total} announcements`)
+            }
+          />
+        }
+      />
+
       {visible.length === 0 ? (
-        <div className="empty">
-          <div className="ill">
-            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /><path d="M12 12v4M10 14h4" strokeWidth="2" /></svg>
-          </div>
-          <h2>{t("განცხადება ვერ მოიძებნა", "No announcements found")}</h2>
-          <p>{t("ამ ფილტრით განცხადება ვერ მოიძებნა.", "No announcements match this filter.")}</p>
-        </div>
+        <EmptyState
+          icon={<Search size={42} sw={1.6} />}
+          title={t("განცხადება ვერ მოიძებნა", "No announcements found")}
+          text={t("ამ ფილტრით განცხადება ვერ მოიძებნა.", "No announcements match this filter.")}
+          action={
+            hasFilters ? (
+              <button type="button" className="btn btn-ghost btn-sm" onClick={clearFilters}>
+                {t("გასუფთავება", "Clear")}
+              </button>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="grid">
           {visible.map((a) => {

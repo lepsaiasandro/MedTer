@@ -5,6 +5,7 @@ import api, { API_BASE } from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
 import { ArrowLeft, Plus, Search, Send, Users, X } from "../components/icons";
+import { matchesSearch } from "../lib/search";
 
 interface ChatGroup {
   id: number;
@@ -221,10 +222,8 @@ export default function Chat() {
   };
 
   const filtered = useMemo(
-    () => (q
-      ? groups.filter((g) => `${g.name} ${g.city ?? ""} ${g.announcementType ?? ""}`.toLowerCase().includes(q))
-      : groups),
-    [groups, q]
+    () => groups.filter((g) => matchesSearch(query, [g.name, g.city, g.announcementType, g.lastMessagePreview])),
+    [groups, query]
   );
 
   const recentGroups = useMemo(() => {

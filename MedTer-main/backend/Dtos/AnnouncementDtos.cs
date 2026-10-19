@@ -16,7 +16,8 @@ public record CreateAnnouncementDto(
     string? ImageUrl,
     DateTime? StartDate,
     DateTime? RegistrationDeadline,
-    string? Status);
+    string? Status,
+    string? MeetingAccess = null);
 
 public record AnnouncementDto(
     int Id,
@@ -43,7 +44,9 @@ public record AnnouncementDto(
     bool IsInterested,
     bool IsFavorite,
     DateTime CreatedAt = default,
-    bool HasGroupChat = false);
+    bool HasGroupChat = false,
+    /// <summary>Meeting link / exact venue — only populated for registered doctors and owners.</summary>
+    string? MeetingAccess = null);
 
 // A doctor who marked interest (shown to the owning center).
 public record InterestedDoctorDto(

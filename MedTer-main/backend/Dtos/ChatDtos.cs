@@ -54,6 +54,9 @@ public record TrainingCenterDto(
     string? Phone,
     double AverageRating,
     int RatingCount,
-    int? MyRating);
+    int? MyRating,
+    int AnnouncementCount = 0,
+    int UpcomingCount = 0,
+    IReadOnlyList<string>? Categories = null);
 
 public record RateDto(int Stars);

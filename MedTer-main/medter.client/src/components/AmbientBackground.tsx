@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 const ACTIVE_MS = 4200;
 
 /** Dense app surfaces get a quieter ambient (mesh/orbs only). */
-const QUIET_PREFIXES = ["/chat", "/admin", "/announcements", "/my-announcements", "/certificates", "/profile", "/centers"];
+const QUIET_PREFIXES = ["/chat", "/admin", "/announcements", "/dashboard", "/my-announcements", "/certificates", "/profile", "/centers"];
 
 function isQuietPath(pathname: string) {
   return QUIET_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));

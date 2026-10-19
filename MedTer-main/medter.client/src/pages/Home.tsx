@@ -3,9 +3,8 @@ import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import { Cap, Chat, Check, Trophy, Users, Calendar, Clock, Pin } from "../components/icons";
+import { Cap, Chat, Check, Trophy, Users, Calendar, Clock, Pin, Stethoscope } from "../components/icons";
 import { StarsView } from "../components/Stars";
-import LinearAdBanner from "../components/LinearAdBanner";
 import logoIcon from "../assets/medter-icon.png";
 
 interface TopCenter {
@@ -58,6 +57,15 @@ function Landing() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    const id = window.location.hash.replace("#", "");
+    if (!id) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   return (
     <div className="landing">
       <div className="landing-bg" aria-hidden="true">
@@ -76,7 +84,7 @@ function Landing() {
         <div className="landing-hero-inner">
           <img src={logoIcon} alt="" className="landing-brand" />
           <h1 className="landing-title">
-            Med<span>Ter</span>
+            Med<span>Ter</span>.ge
           </h1>
           <p className="landing-tagline">
             {t(
@@ -98,15 +106,19 @@ function Landing() {
         </div>
       </section>
 
-      <div className="landing-ads">
-        <LinearAdBanner embedded />
-      </div>
-
-      <section className="landing-section landing-top">
+      <section className="landing-section landing-top" id="top-centers">
         <div className="landing-top-head">
-          <h2 className="section-title">{t("ტოპ ტრენინგ ცენტრები", "Top training centers")}</h2>
-          <button type="button" className="btn btn-text btn-sm" onClick={() => navigate("/centers")}>
-            {t("ყველა", "View all")}
+          <div>
+            <h2 className="section-title">{t("ტოპ ტრენინგ ცენტრები", "Top training centers")}</h2>
+            <p className="landing-section-sub">
+              {t(
+                "ცენტრები, რომლებსაც ექიმები ყველაზე ხშირად ირჩევენ.",
+                "Centers that doctors choose most often."
+              )}
+            </p>
+          </div>
+          <button type="button" className="btn btn-text btn-sm landing-top-all" onClick={() => navigate("/centers")}>
+            {t("ყველა ცენტრი →", "All centers →")}
           </button>
         </div>
 
@@ -120,46 +132,125 @@ function Landing() {
           </p>
         ) : (
           <div className="landing-top-grid">
-            {topCenters.map((c, i) => (
-              <button
-                key={c.userId}
-                type="button"
-                className="landing-top-card reveal"
-                style={{ animationDelay: `${i * 60}ms` }}
-                onClick={() => navigate("/centers")}
-              >
-                <span className="landing-top-rank">{i + 1}</span>
-                <span className="landing-top-body">
-                  <strong>{c.name}</strong>
-                  {c.city && (
-                    <span className="landing-top-city">
-                      <Pin size={12} /> {c.city}
+            {topCenters.map((c, i) => {
+              const noRating = !c.ratingCount;
+              return (
+                <button
+                  key={c.userId}
+                  type="button"
+                  className="landing-top-card reveal"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                  onClick={() => navigate("/centers")}
+                >
+                  <span className="landing-top-rank">{i + 1}</span>
+                  <span className="landing-top-body">
+                    <strong>{c.name}</strong>
+                    {c.city && (
+                      <span className="landing-top-city">
+                        <Pin size={12} /> {c.city}
+                      </span>
+                    )}
+                    <span className="landing-top-meta">
+                      {noRating ? (
+                        <span className="landing-top-norate">
+                          {t("შეფასება ჯერ არ არის", "No rating yet")}
+                        </span>
+                      ) : (
+                        <StarsView value={c.averageRating} count={c.ratingCount} size={13} />
+                      )}
+                      {noRating && (
+                        <span className="landing-top-new">{t("ახალი", "New")}</span>
+                      )}
                     </span>
-                  )}
-                  <StarsView value={c.averageRating} count={c.ratingCount} size={13} />
-                </span>
-              </button>
-            ))}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </section>
 
-      <section className="landing-section landing-roles">
-        <div className="landing-role reveal">
-          <h3>{t("ექიმებისთვის", "For doctors")}</h3>
-          <ul className="checks">
-            <li><Check size={16} /> {t("ცენტრების ძიება და შეფასება", "Search and rate centers")}</li>
-            <li><Check size={16} /> {t("ტრენინგებზე დაინტერესება", "Mark interest in trainings")}</li>
-            <li><Check size={16} /> {t("უსდ ქულები და სერტიფიკატები", "CPD points and certificates")}</li>
-          </ul>
+      <section className="landing-section landing-audience" id="audience">
+        <div className="landing-audience-head">
+          <h2 className="section-title">{t("ვისთვისაა MedTer", "Who MedTer is for")}</h2>
+          <p className="landing-section-sub">
+            {t("ერთი პლატფორმა ორი მხარისთვის.", "One platform for two sides.")}
+          </p>
         </div>
-        <div className="landing-role reveal" style={{ animationDelay: "80ms" }}>
-          <h3>{t("ტრენინგ ცენტრებისთვის", "For training centers")}</h3>
-          <ul className="checks">
-            <li><Check size={16} /> {t("განცხადებების გამოქვეყნება", "Publish announcements")}</li>
-            <li><Check size={16} /> {t("ექიმებთან ჩატი", "Chat with doctors")}</li>
-            <li><Check size={16} /> {t("უსდ ქულების მინიჭება", "Grant CPD points")}</li>
-          </ul>
+
+        <div className="landing-roles">
+          <div className="landing-role reveal">
+            <span className="landing-role-icon" aria-hidden="true">
+              <Stethoscope size={20} />
+            </span>
+            <h3>{t("ექიმებისთვის", "For doctors")}</h3>
+            <p className="landing-role-desc">
+              {t(
+                "იპოვე ტრენინგები შენი სპეციალობის მიხედვით და დააგროვე უსდ ქულები.",
+                "Find trainings by your specialty and earn CPD credits."
+              )}
+            </p>
+            <ul className="checks">
+              <li><Check size={16} /> {t("ცენტრების ძიება და შეფასება", "Search and rate centers")}</li>
+              <li><Check size={16} /> {t("ტრენინგებზე დარეგისტრირება", "Register for trainings")}</li>
+              <li><Check size={16} /> {t("სერტიფიკატების მართვა ერთ ადგილას", "Manage certificates in one place")}</li>
+            </ul>
+            <button
+              type="button"
+              className="btn btn-ghost landing-role-cta"
+              onClick={() => navigate("/register?role=doctor")}
+            >
+              {t("ექიმის რეგისტრაცია", "Doctor registration")}
+            </button>
+          </div>
+
+          <div className="landing-role reveal" style={{ animationDelay: "80ms" }}>
+            <span className="landing-role-icon" aria-hidden="true">
+              <Cap size={20} />
+            </span>
+            <h3>{t("ტრენინგ ცენტრებისთვის", "For training centers")}</h3>
+            <p className="landing-role-desc">
+              {t(
+                "მოიზიდე ექიმები, მართე კურსები და გაზარდე შენი აუდიტორია.",
+                "Attract doctors, manage courses, and grow your audience."
+              )}
+            </p>
+            <ul className="checks">
+              <li><Check size={16} /> {t("კონფერენციებისა და ტრენინგების გამოქვეყნება", "Publish conferences and trainings")}</li>
+              <li><Check size={16} /> {t("მონაწილეების მართვა", "Manage participants")}</li>
+              <li><Check size={16} /> {t("ვერიფიკაცია და ნდობა", "Verification and trust")}</li>
+            </ul>
+            <button
+              type="button"
+              className="btn btn-ghost landing-role-cta"
+              onClick={() => navigate("/register?role=center")}
+            >
+              {t("ცენტრის რეგისტრაცია", "Center registration")}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-section landing-banner" id="contact">
+        <div className="landing-banner-inner reveal">
+          <h2>{t("მზად ხარ პროფესიული ზრდისთვის?", "Ready for professional growth?")}</h2>
+          <p>
+            {t(
+              "შექმენი ანგარიში რამდენიმე წუთში და დაიწყე სწავლა ქართულ სამედიცინო საზოგადოებასთან ერთად.",
+              "Create an account in a few minutes and start learning with the Georgian medical community."
+            )}
+          </p>
+          <div className="landing-banner-cta">
+            <button className="btn btn-primary btn-lg" onClick={() => navigate("/register")}>
+              {t("რეგისტრაცია", "Register")}
+            </button>
+            <button
+              className="btn btn-ghost btn-lg"
+              onClick={() => window.dispatchEvent(new Event("medter:open-login"))}
+            >
+              {t("შესვლა", "Sign in")}
+            </button>
+          </div>
         </div>
       </section>
     </div>
@@ -216,7 +307,7 @@ function DoctorHome() {
       </header>
 
       <div className="stats stats-3 reveal">
-        <button type="button" className="stat action-stat" onClick={() => navigate("/certificates")}>
+        <button type="button" className="stat action-stat" onClick={() => navigate("/profile")}>
           <div className="k">
             <span className="ic" style={{ background: "var(--teal-soft)", color: "var(--teal)" }}><Trophy size={14} /></span>
             {t("უსდ ქულები", "CPD points")}
@@ -311,27 +402,27 @@ function CenterHome() {
           <h1>{t("გამარჯობა", "Hello")}, {user?.displayName}</h1>
           <p>{t("განცხადებები, დაინტერესებები და შეტყობინებები ერთ ადგილას.", "Announcements, interest and messages in one place.")}</p>
         </div>
-        <button className="btn btn-primary" onClick={() => navigate("/my-announcements")}>
-          {t("ჩემი განცხადებები", "My announcements")}
+        <button className="btn btn-primary" onClick={() => navigate("/dashboard")}>
+          {t("დაფა", "Dashboard")}
         </button>
       </header>
 
       <div className="stats stats-3 reveal">
-        <button type="button" className="stat action-stat" onClick={() => navigate("/my-announcements")}>
+        <button type="button" className="stat action-stat" onClick={() => navigate("/dashboard")}>
           <div className="k">
             <span className="ic" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}><Cap size={14} /></span>
             {t("გამოქვეყნებული", "Published")}
           </div>
           <div className="v">{published}</div>
         </button>
-        <button type="button" className="stat action-stat" onClick={() => navigate("/my-announcements")}>
+        <button type="button" className="stat action-stat" onClick={() => navigate("/dashboard")}>
           <div className="k">
             <span className="ic" style={{ background: "var(--warning-soft)", color: "var(--warning)" }}><Clock size={14} /></span>
             {t("მოლოდინში", "Pending")}
           </div>
           <div className="v">{pending}</div>
         </button>
-        <button type="button" className="stat action-stat" onClick={() => navigate("/my-announcements")}>
+        <button type="button" className="stat action-stat" onClick={() => navigate("/dashboard")}>
           <div className="k">
             <span className="ic" style={{ background: "var(--teal-soft)", color: "var(--teal)" }}><Users size={14} /></span>
             {t("დაინტერესდა", "Interested")}
@@ -347,7 +438,7 @@ function CenterHome() {
         {drafts.length === 0 ? (
           <div className="dash-empty reveal">
             <p>{t("ყველა განცხადება განახლებულია. შექმენი ახალი ტრენინგი.", "Everything is up to date. Create a new training.")}</p>
-            <button className="btn btn-primary btn-sm" onClick={() => navigate("/my-announcements")}>
+            <button className="btn btn-primary btn-sm" onClick={() => navigate("/dashboard")}>
               {t("ახალი განცხადება", "New announcement")}
             </button>
           </div>
@@ -359,7 +450,7 @@ function CenterHome() {
                 type="button"
                 className="dash-list-item reveal"
                 style={{ animationDelay: `${i * 50}ms` }}
-                onClick={() => navigate("/my-announcements")}
+                onClick={() => navigate("/dashboard")}
               >
                 <span className="dash-list-ic"><Cap size={18} /></span>
                 <span className="dash-list-body">

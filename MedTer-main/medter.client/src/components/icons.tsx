@@ -24,10 +24,20 @@ export const Chat = (p: IconProps) => <Icon {...p}><path d="M21 15a2 2 0 0 1-2 2
 export const ChevronDown = (p: IconProps) => <Icon sw={2} {...p}><path d="M6 9l6 6 6-6" /></Icon>;
 export const Home = (p: IconProps) => <Icon {...p}><path d="M3 12l9-9 9 9M5 10v10h14V10" /></Icon>;
 export const Cap = (p: IconProps) => <Icon {...p}><path d="M22 10 12 5 2 10l10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></Icon>;
+export const Stethoscope = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M11 2v2" />
+    <path d="M5 2v2" />
+    <path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1" />
+    <path d="M8 15a6 6 0 0 0 12 0v-3" />
+    <circle cx="20" cy="10" r="2" />
+  </Icon>
+);
 export const Plus = (p: IconProps) => <Icon sw={2.2} {...p}><path d="M12 5v14M5 12h14" /></Icon>;
 export const Calendar = (p: IconProps) => <Icon sw={2} {...p}><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></Icon>;
 export const Pin = (p: IconProps) => <Icon sw={2} {...p}><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></Icon>;
 export const Mail = (p: IconProps) => <Icon sw={2} {...p}><path d="M22 8.5V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-1.5" /><path d="m2 8 10 6 10-6" /></Icon>;
+export const Phone = (p: IconProps) => <Icon sw={2} {...p}><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.6a2 2 0 0 1-.5 2.1L8.1 9.6a16 16 0 0 0 6.3 6.3l1.2-1.2a2 2 0 0 1 2.1-.5c.8.3 1.7.6 2.6.7A2 2 0 0 1 22 16.9z" /></Icon>;
 export const Eye = (p: IconProps) => <Icon {...p}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></Icon>;
 export const Edit = (p: IconProps) => <Icon {...p}><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></Icon>;
 export const Trash = (p: IconProps) => <Icon {...p}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon>;
@@ -52,4 +62,7 @@ export const Clock = (p: IconProps) => <Icon sw={2} {...p}><circle cx="12" cy="1
 export const Funnel = (p: IconProps) => <Icon sw={2} {...p}><path d="M3 4h18l-7 8v6l-4 2v-8z" /></Icon>;
 export const Bookmark = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
   <svg width={p.size ?? 17} height={p.size ?? 17} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
+);
+export const ExternalLink = (p: IconProps) => (
+  <Icon sw={2} {...p}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" /></Icon>
 );

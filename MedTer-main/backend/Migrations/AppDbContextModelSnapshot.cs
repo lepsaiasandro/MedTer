@@ -255,6 +255,9 @@ namespace backend.Migrations
                     b.Property<string>("Language")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("MeetingAccess")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("Points")
                         .HasColumnType("int");
 

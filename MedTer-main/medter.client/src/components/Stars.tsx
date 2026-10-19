@@ -22,15 +22,17 @@ function Star({ fill, size = 16 }: { fill: number; size?: number }) {
 }
 
 /** Read-only average display: `value` (e.g. 4.3) + optional count. */
-export function StarsView({ value, count, size = 15 }: { value: number; count?: number; size?: number }) {
+export function StarsView({ value, count, size = 15, onDark = false }: { value: number; count?: number; size?: number; onDark?: boolean }) {
+  const muted = onDark ? "rgba(255,255,255,.88)" : "var(--muted)";
+  const soft = onDark ? "rgba(255,255,255,.7)" : "var(--soft)";
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
       <span style={{ display: "inline-flex", gap: 1 }}>
         {[0, 1, 2, 3, 4].map((i) => <Star key={i} fill={Math.max(0, Math.min(1, value - i))} size={size} />)}
       </span>
       {count !== undefined && (
-        <span style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 600 }}>
-          {value ? value.toFixed(1) : "—"} {count > 0 && <span style={{ color: "var(--soft)", fontWeight: 500 }}>({count})</span>}
+        <span style={{ fontSize: 12.5, color: muted, fontWeight: 600 }}>
+          {value ? value.toFixed(1) : "—"} {count > 0 && <span style={{ color: soft, fontWeight: 500 }}>({count})</span>}
         </span>
       )}
     </span>

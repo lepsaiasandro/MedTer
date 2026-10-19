@@ -83,8 +83,8 @@ public class BillingController : ControllerBase
         {
             Mode = "subscription",
             Customer = user.StripeCustomerId,
-            SuccessUrl = $"{baseUrl}/pricing?success=1&session_id={{CHECKOUT_SESSION_ID}}",
-            CancelUrl = $"{baseUrl}/pricing?canceled=1",
+            SuccessUrl = $"{baseUrl}/profile?success=1&session_id={{CHECKOUT_SESSION_ID}}",
+            CancelUrl = $"{baseUrl}/profile?canceled=1",
             LineItems =
             [
                 new SessionLineItemOptions

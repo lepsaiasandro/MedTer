@@ -22,19 +22,19 @@ export default function PointsPanel() {
 
   const points = certs.reduce((s, c) => s + c.points, 0);
   const pct = Math.min(100, Math.round((points / GOAL) * 100));
-  const r = 52;
+  const r = 58;
   const circ = 2 * Math.PI * r;
   const offset = circ - (pct / 100) * circ;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div className="card" style={{ padding: 20 }}>
+      <div className="ring-card">
         <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 16 }}>{t("ჩემი პროგრესი", "My Progress")}</h3>
         <div className="ring-wrap">
-          <div className="ring">
-            <svg width="150" height="150" viewBox="0 0 120 120" style={{ transform: "rotate(-90deg)" }}>
-              <circle cx="60" cy="60" r={r} fill="none" stroke="var(--border)" strokeWidth="10" />
-              <circle cx="60" cy="60" r={r} fill="none" stroke="var(--teal)" strokeWidth="10" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} />
+          <div className="progress-ring">
+            <svg width="150" height="150" viewBox="0 0 150 150" style={{ transform: "rotate(-90deg)", border: "none", outline: "none" }}>
+              <circle cx="75" cy="75" r={r} fill="none" stroke="var(--border)" strokeWidth="10" />
+              <circle cx="75" cy="75" r={r} fill="none" stroke="var(--teal)" strokeWidth="10" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} />
             </svg>
             <div className="center">
               <div>
