@@ -156,7 +156,7 @@ export function ResultMeta({ shown, total, label, hasFilters }: ResultMetaProps)
 }
 
 type FilterBarProps = {
-  search: ReactNode;
+  search?: ReactNode;
   filters?: ReactNode;
   chips?: ReactNode;
   meta?: ReactNode;
@@ -168,7 +168,7 @@ export function FilterBar({ search, filters, chips, meta, className }: FilterBar
   return (
     <div className={`filter-bar${className ? ` ${className}` : ""}`}>
       <div className="fb-row">
-        {search}
+        {search ?? null}
         {filters ? <div className="fb-filters">{filters}</div> : null}
       </div>
       {(chips || meta) && (

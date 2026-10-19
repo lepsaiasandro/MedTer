@@ -30,7 +30,7 @@ export default function Certificates() {
       <div className="page-head">
         <div className="h-text">
           <h1>{t("ჩემი სერტიფიკატები", "My Certificates")}</h1>
-          <p>{t("ტრენინგებზე მიღებული სერტიფიკატები და დაგროვილი უსდ ქულები", "Certificates earned at trainings and accumulated CPD points")}</p>
+          <p>{t("ტრენინგებზე მიღებული სერტიფიკატები და დაგროვილი უპგ ქულები", "Certificates earned at trainings and accumulated CPD points")}</p>
         </div>
       </div>
 

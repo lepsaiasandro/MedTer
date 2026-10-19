@@ -40,12 +40,20 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Database — connection string from appsettings or Azure App Settings (ConnectionStrings__Default)
+// Development can use SQLite (Data Source=…) when SQL Server LocalDB is unavailable.
 var sqlConnection = builder.Configuration.GetConnectionString("Default");
 if (string.IsNullOrWhiteSpace(sqlConnection))
     throw new InvalidOperationException(
         "ConnectionStrings:Default is not configured. Set ConnectionStrings__Default (or Connection string 'Default') in Azure App Settings.");
+var useSqlite = sqlConnection.Contains("Data Source=", StringComparison.OrdinalIgnoreCase)
+    || sqlConnection.Contains("DataSource=", StringComparison.OrdinalIgnoreCase);
 builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlServer(sqlConnection));
+{
+    if (useSqlite)
+        opt.UseSqlite(sqlConnection);
+    else
+        opt.UseSqlServer(sqlConnection);
+});
 
 // Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt =>
@@ -142,7 +150,11 @@ app.UseForwardedHeaders();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    // SQL Server migrations are not compatible with SQLite — create schema from the model instead.
+    if (db.Database.IsSqlite())
+        db.Database.EnsureCreated();
+    else
+        db.Database.Migrate();
     // Development always seeds demo data. Production: set Seed__Demo=true in Azure App Settings.
     var seedDemo = app.Environment.IsDevelopment()
         || app.Configuration.GetValue("Seed:Demo", false);

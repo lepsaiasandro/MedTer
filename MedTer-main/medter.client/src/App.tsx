@@ -48,7 +48,7 @@ export default function App() {
         {/* Auth required */}
         <Route path="/centers/:userId" element={<Shell><Protected><CenterDetail /></Protected></Shell>} />
         <Route path="/chat" element={<Shell><Protected><Chat /></Protected></Shell>} />
-        <Route path="/announcements" element={<Shell><Protected><Announcements /></Protected></Shell>} />
+        <Route path="/announcements" element={<Shell><Announcements /></Shell>} />
         <Route path="/dashboard" element={<Shell><Protected><RoleDashboard /></Protected></Shell>} />
         <Route path="/my-announcements" element={<Shell><Protected><Navigate to="/dashboard" replace /></Protected></Shell>} />
         <Route path="/certificates" element={<Shell><Protected><Navigate to="/profile" replace /></Protected></Shell>} />

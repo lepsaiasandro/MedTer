@@ -11,7 +11,18 @@ const ShareIc = () => <svg width="17" height="17" viewBox="0 0 24 24" fill="none
 const MENU_W = 220;
 const MENU_H = 210;
 
-export default function ShareMenu({ title, url }: { title: string; url?: string }) {
+export default function ShareMenu({
+  title,
+  url,
+  className,
+  label,
+}: {
+  title: string;
+  url?: string;
+  className?: string;
+  /** When set, renders a labeled button (Facebook Events style). */
+  label?: string;
+}) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -41,7 +52,16 @@ export default function ShareMenu({ title, url }: { title: string; url?: string 
 
   return (
     <>
-      <button ref={btnRef} className="act" title="გაზიარება" onClick={toggle}><ShareIc /></button>
+      <button
+        ref={btnRef}
+        type="button"
+        className={className || "act"}
+        title="გაზიარება"
+        onClick={toggle}
+      >
+        <ShareIc />
+        {label ? <span>{label}</span> : null}
+      </button>
       {/* Rendered into <body> via a portal so no parent's transform/overflow can clip it. */}
       {pos && createPortal(
         <>

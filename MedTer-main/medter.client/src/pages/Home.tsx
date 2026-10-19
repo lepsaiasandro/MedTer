@@ -88,7 +88,7 @@ function Landing() {
           </h1>
           <p className="landing-tagline">
             {t(
-              "სამედიცინო ტრენინგები, ცენტრები და უსდ ქულები — ერთ ადგილას.",
+              "სამედიცინო ტრენინგები, ცენტრები და უპგ ქულები — ერთ ადგილას.",
               "Medical trainings, centers and CPD points — in one place."
             )}
           </p>
@@ -186,7 +186,7 @@ function Landing() {
             <h3>{t("ექიმებისთვის", "For doctors")}</h3>
             <p className="landing-role-desc">
               {t(
-                "იპოვე ტრენინგები შენი სპეციალობის მიხედვით და დააგროვე უსდ ქულები.",
+                "იპოვე ტრენინგები შენი სპეციალობის მიხედვით და დააგროვე უპგ ქულები.",
                 "Find trainings by your specialty and earn CPD credits."
               )}
             </p>
@@ -310,7 +310,7 @@ function DoctorHome() {
         <button type="button" className="stat action-stat" onClick={() => navigate("/profile")}>
           <div className="k">
             <span className="ic" style={{ background: "var(--teal-soft)", color: "var(--teal)" }}><Trophy size={14} /></span>
-            {t("უსდ ქულები", "CPD points")}
+            {t("უპგ ქულები", "CPD points")}
           </div>
           <div className="v">{points}</div>
         </button>

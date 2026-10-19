@@ -3,14 +3,15 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import { Calendar, Pin, Mail, Search, Check, Bookmark, Cap, Chat, X, ExternalLink } from "../components/icons";
+import { Calendar, Pin, Mail, Search, Check, Bookmark, Cap, Chat, X, ExternalLink, Star, ThumbUp } from "../components/icons";
 import ShareMenu from "../components/ShareMenu";
 import PointsPanel from "../components/PointsPanel";
-import MediaPlaceholder from "../components/MediaPlaceholder";
 import EmptyState from "../components/EmptyState";
-import { SkeletonGrid } from "../components/Skeleton";
-import LinearAdBanner from "../components/LinearAdBanner";
-import { FilterBar, SearchField, FilterSelect, FilterToggle, FilterChips, ResultMeta, type FilterChip } from "../components/FilterBar";
+import AuthRequired from "../components/AuthRequired";
+import LinearAdBanner, { useSponsoredCreatives } from "../components/LinearAdBanner";
+import SponsoredEventCard from "../components/SponsoredEventCard";
+import EventDetailModal from "../components/EventDetailModal";
+import { FilterBar, FilterSelect, FilterToggle, FilterChips, ResultMeta, type FilterChip } from "../components/FilterBar";
 import { matchesSearch } from "../lib/search";
 import { pickCardBanner } from "../lib/cardBanners";
 
@@ -48,6 +49,8 @@ interface InterestResponse {
 
 const MONTHS_KA = ["იანვარი", "თებერვალი", "მარტი", "აპრილი", "მაისი", "ივნისი", "ივლისი", "აგვისტო", "სექტემბერი", "ოქტომბერი", "ნოემბერი", "დეკემბერი"];
 const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MONTHS_SHORT_KA = ["იან", "თებ", "მარ", "აპრ", "მაი", "ივნ", "ივლ", "აგვ", "სექ", "ოქტ", "ნოე", "დეკ"];
+const MONTHS_SHORT_EN = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 type Flash = {
   kind: "ok" | "err";
@@ -60,7 +63,29 @@ type Flash = {
 
 const isHttpUrl = (value: string) => /^https?:\/\//i.test(value.trim());
 
+function dayKey(iso?: string) {
+  if (!iso) return "nodate";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "nodate";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function Announcements() {
+  const { user } = useAuth();
+  if (!user) {
+    return (
+      <AuthRequired
+        titleKa="ტრენინგების ფიდის სანახავად ანგარიში გჭირდება"
+        titleEn="You need an account to view the trainings feed"
+        textKa="შექმენი ანგარიში ან შედი — შემდეგ დაინახავ ყველა ტრენინგს Events-ის მსგავს ფიდში."
+        textEn="Create an account or sign in — then you'll see all trainings in an Events-style feed."
+      />
+    );
+  }
+  return <AnnouncementsFeed />;
+}
+
+function AnnouncementsFeed() {
   const { user } = useAuth();
   const { t, lang } = usePrefs();
   const navigate = useNavigate();
@@ -68,6 +93,7 @@ export default function Announcements() {
   const isDoctor = user?.role === "Doctor";
   const mineTab = isDoctor && searchParams.get("mine") === "1";
   const justRegistered = searchParams.get("welcome") === "1";
+  const sponsored = useSponsoredCreatives("trainings");
 
   const [items, setItems] = useState<Announcement[]>([]);
   const [mineItems, setMineItems] = useState<Announcement[]>([]);
@@ -75,6 +101,8 @@ export default function Announcements() {
   const [modalId, setModalId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
+  /** Local like counts (seeded from engagement; Like toggles favorite). */
+  const [likeCounts, setLikeCounts] = useState<Record<number, number>>({});
 
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [category, setCategory] = useState(() => searchParams.get("cat") ?? "");
@@ -82,6 +110,11 @@ export default function Announcements() {
   const [city, setCity] = useState(() => searchParams.get("city") ?? "");
   const [sort, setSort] = useState(() => searchParams.get("sort") || "newest");
   const [favOnly, setFavOnly] = useState(() => searchParams.get("fav") === "1");
+
+  useEffect(() => {
+    const q = searchParams.get("q") ?? "";
+    setSearch(q);
+  }, [searchParams]);
 
   const fmtDate = (iso?: string) => {
     if (!iso) return "";
@@ -97,6 +130,25 @@ export default function Announcements() {
     if (isNaN(d.getTime())) return "";
     const time = d.toLocaleTimeString(lang === "en" ? "en-GB" : "ka-GE", { hour: "2-digit", minute: "2-digit" });
     return `${fmtDate(iso)} · ${time}`;
+  };
+
+  const fmtTime = (iso?: string) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString(lang === "en" ? "en-GB" : "ka-GE", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const dateParts = (iso?: string) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return {
+      day: d.getDate(),
+      month: (lang === "en" ? MONTHS_SHORT_EN : MONTHS_SHORT_KA)[d.getMonth()],
+      weekday: d.toLocaleDateString(lang === "en" ? "en-GB" : "ka-GE", { weekday: "long" }),
+      year: d.getFullYear(),
+    };
   };
 
   const findAnnouncement = (id: number) =>
@@ -126,6 +178,18 @@ export default function Announcements() {
   };
 
   useEffect(() => { load(); }, [isDoctor]);
+
+  useEffect(() => {
+    setLikeCounts((prev) => {
+      const next = { ...prev };
+      for (const a of items) {
+        if (next[a.id] == null) {
+          next[a.id] = a.interestedCount + (a.isFavorite ? 1 : 0);
+        }
+      }
+      return next;
+    });
+  }, [items]);
 
   useEffect(() => {
     if (searchParams.get("tab") === "centers") {
@@ -174,7 +238,6 @@ export default function Announcements() {
     setSearchParams(next, { replace: true });
   };
 
-  const setSearchQ = (v: string) => { setSearch(v); writeFilterParams({ q: v || null }); };
   const setCategoryQ = (v: string) => { setCategory(v); writeFilterParams({ cat: v || null }); };
   const setFormatQ = (v: string) => { setFormat(v); writeFilterParams({ format: v || null }); };
   const setCityQ = (v: string) => { setCity(v); writeFilterParams({ city: v || null }); };
@@ -238,6 +301,15 @@ export default function Announcements() {
           city: res.data.city ?? a.city,
           format: res.data.format ?? a.format,
         };
+        /* Going implies Interested (Facebook Events behavior) */
+        if (!a.isFavorite) {
+          try { await api.post(`/announcements/${a.id}/favorite`); } catch { /* optional */ }
+          merged.isFavorite = true;
+          setLikeCounts((c) => ({
+            ...c,
+            [a.id]: Math.max(0, (c[a.id] ?? a.interestedCount) + 1),
+          }));
+        }
         patchLists(a.id, merged);
         const updated = { ...a, ...merged, isInterested: true, interestedCount: nextCount };
         setMineItems((prev) => {
@@ -269,12 +341,16 @@ export default function Announcements() {
   };
 
   const toggleFav = async (a: Announcement) => {
-    patchLists(a.id, { isFavorite: !a.isFavorite });
+    const next = !a.isFavorite;
+    const prevCount = likeCounts[a.id] ?? a.interestedCount;
+    patchLists(a.id, { isFavorite: next });
+    setLikeCounts((c) => ({ ...c, [a.id]: Math.max(0, prevCount + (next ? 1 : -1)) }));
     try {
       if (a.isFavorite) await api.delete(`/announcements/${a.id}/favorite`);
       else await api.post(`/announcements/${a.id}/favorite`);
     } catch {
       patchLists(a.id, { isFavorite: a.isFavorite });
+      setLikeCounts((c) => ({ ...c, [a.id]: prevCount }));
     }
   };
 
@@ -302,8 +378,20 @@ export default function Announcements() {
     if (sort === "date") list = [...list].sort((a, b) => new Date(a.startDate ?? 0).getTime() - new Date(b.startDate ?? 0).getTime());
     else if (sort === "points") list = [...list].sort((a, b) => b.points - a.points);
     else if (sort === "interested") list = [...list].sort((a, b) => b.interestedCount - a.interestedCount);
+    else list = [...list].sort((a, b) => new Date(b.startDate ?? 0).getTime() - new Date(a.startDate ?? 0).getTime() || b.id - a.id);
     return list;
   }, [source, search, category, format, city, favOnly, sort, mineTab]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, Announcement[]>();
+    for (const a of visible) {
+      const key = dayKey(a.startDate);
+      const bucket = map.get(key);
+      if (bucket) bucket.push(a);
+      else map.set(key, [a]);
+    }
+    return [...map.entries()];
+  }, [visible]);
 
   const hasFilters = Boolean(search || category || format || city || favOnly);
 
@@ -313,7 +401,7 @@ export default function Announcements() {
   };
 
   const activeChips: FilterChip[] = [
-    search ? { id: "q", label: `\u201C${search.trim()}\u201D`, onClear: () => setSearchQ("") } : null,
+    search ? { id: "q", label: `\u201C${search.trim()}\u201D`, onClear: () => writeFilterParams({ q: null }) } : null,
     category ? { id: "cat", label: category, onClear: () => setCategoryQ("") } : null,
     format ? {
       id: "format",
@@ -327,6 +415,13 @@ export default function Announcements() {
   const placeLabel = (a: Announcement) => {
     const online = a.format === "ონლაინ";
     return online ? t("ონლაინ", "Online") : (a.city || t("დასწრებით", "In person"));
+  };
+
+  const sectionTitle = (key: string, first: Announcement) => {
+    if (key === "nodate") return t("თარიღი მითითებული არ არის", "Date not set");
+    const parts = dateParts(first.startDate);
+    if (!parts) return t("თარიღი მითითებული არ არის", "Date not set");
+    return `${parts.weekday} · ${parts.day} ${parts.month} ${parts.year}`;
   };
 
   return (
@@ -356,13 +451,13 @@ export default function Announcements() {
           </div>
         )}
 
-        <div className="page-head">
+        <div className="page-head events-page-head">
           <div className="h-text">
             <h1>{mineTab ? t("ჩემი ტრენინგები", "My Trainings") : t("ტრენინგები", "Trainings")}</h1>
             <p>
               {mineTab
                 ? t("შენი რეგისტრაციები — თარიღი და დეტალები", "Your registrations — dates and details")
-                : t("დაათვალიერე და დაარეგისტრირდი", "Browse and register")}
+                : t("Events ფიდი — დაათვალიერე და დაარეგისტრირდი", "Events feed — browse and register")}
             </p>
           </div>
         </div>
@@ -382,14 +477,6 @@ export default function Announcements() {
         )}
 
         <FilterBar
-          search={
-            <SearchField
-              value={search}
-              onChange={setSearchQ}
-              placeholder={t("ძებნა სათაურით, ცენტრით, ქალაქით…", "Search by title, center, city…")}
-              aria-label={t("ტრენინგების ძებნა", "Search trainings")}
-            />
-          }
           filters={
             <>
               <FilterSelect
@@ -465,7 +552,11 @@ export default function Announcements() {
         />
 
         {loading ? (
-          <SkeletonGrid count={6} />
+          <div className="events-feed fb-events" aria-busy="true">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="event-row--skel" />
+            ))}
+          </div>
         ) : mineTab && mineItems.length === 0 ? (
           <EmptyState
             icon={<Cap size={42} sw={1.6} />}
@@ -487,7 +578,7 @@ export default function Announcements() {
           <EmptyState
             icon={<Search size={42} sw={1.6} />}
             title={t("ვერაფერი მოიძებნა", "Nothing found")}
-            text={t("შეცვალე ფილტრები ან საძიებო სიტყვა.", "Try different filters or search terms.")}
+            text={t("შეცვალე ფილტრები ან საძიებო სიტყვა ზედა ძებნაში.", "Try different filters or the top search.")}
             action={
               <button className="btn btn-ghost btn-sm" onClick={clearFilters}>
                 {t("გასუფთავება", "Clear")}
@@ -495,124 +586,173 @@ export default function Announcements() {
             }
           />
         ) : (
-          <div className="grid">
-            {visible.map((a, i) => {
-              const online = a.format === "ონლაინ";
-              const place = placeLabel(a);
-              const registered = mineTab || a.isInterested;
-
-              const bannerUrl = pickCardBanner(a.id, a.imageUrl);
-
+          <div className="events-feed fb-events">
+            {grouped.map(([key, list]) => {
+              let feedIndex = 0;
               return (
-                <article
-                  key={a.id}
-                  className={`card card--banner card-interactive reveal${a.isInterested ? " card-pulse" : ""}`}
-                  style={{ animationDelay: `${Math.min(i, 8) * 40}ms`, cursor: "pointer" }}
-                  onClick={() => setModalId(a.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setModalId(a.id);
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className="card-banner-bg" aria-hidden="true">
-                    <img src={bannerUrl} alt="" loading="lazy" />
-                  </div>
+              <section key={key} className="events-day">
+                <h2 className="events-day-title">{sectionTitle(key, list[0])}</h2>
+                <div className="events-day-list">
+                  {list.flatMap((a) => {
+                    const online = a.format === "ონლაინ";
+                    const place = placeLabel(a);
+                    const going = mineTab || a.isInterested;
+                    const parts = dateParts(a.startDate);
+                    const bannerUrl = pickCardBanner(a.id, a.imageUrl);
+                    const time = fmtTime(a.startDate);
+                    const likes = likeCounts[a.id] ?? a.interestedCount;
+                    const interestedSoft = a.isFavorite || going;
+                    const whenLine = [
+                      parts ? `${parts.weekday}` : null,
+                      time || null,
+                      a.category || null,
+                    ].filter(Boolean).join(" · ");
 
-                  {registered && (
-                    <span className="badge-registered" title={t("დარეგისტრირებული", "Registered")}>
-                      <Check size={14} />
-                    </span>
-                  )}
-                  {isDoctor && !mineTab && (
-                    <button
-                      type="button"
-                      className={`act card-banner-fav${registered ? " has-registered" : ""}`}
-                      title={t("რჩეულები", "Favorites")}
-                      style={{ color: a.isFavorite ? "var(--brand)" : "var(--muted)" }}
-                      onClick={(e) => { stopCard(e); toggleFav(a); }}
-                    >
-                      <Bookmark size={16} filled={a.isFavorite} />
-                    </button>
-                  )}
-
-                  <div className="body">
-                    {a.points > 0 && (
-                      <span className="badge-points">
-                        <span className="tealdot" /> {a.points} {t("ქულა", "pts")}
-                      </span>
-                    )}
-                    {a.category && <span className="chip-cat">{a.category}</span>}
-                    <h3>{a.title}</h3>
-                    <div style={{ fontSize: 12.5, color: "rgba(255,255,255,.82)", marginTop: -4 }}>
-                      {a.centerUserId
-                        ? (
-                          <Link
-                            to={`/centers/${a.centerUserId}`}
-                            style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 2 }}
-                            onClick={stopCard}
-                          >
-                            {a.centerName}
-                          </Link>
-                        )
-                        : a.centerName}
-                    </div>
-
-                    <div className="meta">
-                      {a.startDate && (
-                        <div className="row">
-                          <Calendar size={15} /> {mineTab ? fmtDateTime(a.startDate) : fmtDate(a.startDate)}
+                    const card = (
+                      <article
+                        key={a.id}
+                        className={`fb-event${going ? " is-going" : ""}${a.isFavorite ? " is-liked" : ""}`}
+                        onClick={() => setModalId(a.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setModalId(a.id);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <div className="fb-event-cover" aria-hidden="true">
+                          <img src={bannerUrl} alt="" loading="lazy" />
+                          <div className="fb-event-datechip">
+                            {parts ? (
+                              <>
+                                <span className="fb-event-month">{parts.month}</span>
+                                <span className="fb-event-day">{parts.day}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="fb-event-month">—</span>
+                                <span className="fb-event-day"><Calendar size={16} /></span>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      <div className="row">
-                        {online ? <Mail size={15} /> : <Pin size={15} />}
-                        {place}
-                      </div>
-                    </div>
 
-                    <div className="foot" onClick={stopCard}>
-                      {a.price > 0 ? (
-                        <span style={{ fontSize: 13.5, fontWeight: 700 }}>
-                          {a.price} ₾
-                        </span>
-                      ) : (
-                        <span />
-                      )}
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        {mineTab ? (
-                          <>
-                            {a.hasGroupChat && (
-                              <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate("/chat")}>
-                                <Chat size={14} />
+                        <div className="fb-event-body">
+                          {whenLine && <div className="fb-event-when">{whenLine}</div>}
+                          <h3 className="fb-event-title">{a.title}</h3>
+
+                          <div className="fb-event-host">
+                            {t("ღონისძიება:", "Event by")}{" "}
+                            {a.centerUserId ? (
+                              <Link to={`/centers/${a.centerUserId}`} onClick={stopCard}>{a.centerName}</Link>
+                            ) : (
+                              <span>{a.centerName}</span>
+                            )}
+                          </div>
+
+                          <div className="fb-event-place">
+                            {online ? <Mail size={14} /> : <Pin size={14} />}
+                            <span>{place}</span>
+                            {a.price > 0 && (
+                              <>
+                                <span className="fb-event-dot">·</span>
+                                <span>{a.price} ₾</span>
+                              </>
+                            )}
+                            {a.points > 0 && (
+                              <>
+                                <span className="fb-event-dot">·</span>
+                                <span>{a.points} {t("ქულა", "pts")}</span>
+                              </>
+                            )}
+                          </div>
+
+                          <div className="fb-event-social">
+                            <div className="fb-event-reactions">
+                              <span className="fb-like-badge" aria-hidden="true">
+                                <ThumbUp size={11} filled />
+                              </span>
+                              <span>{likes}</span>
+                              <span className="fb-event-dot">·</span>
+                              <span>
+                                {a.interestedCount} {t("მიდის", "going")}
+                                {(interestedSoft || a.interestedCount > 0) && (
+                                  <> · {t("დაინტერესებული", "interested")}</>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="fb-event-actions" onClick={stopCard}>
+                            {isDoctor && (
+                              <button
+                                type="button"
+                                className={`fb-rsvp${a.isFavorite ? " active like" : ""}`}
+                                disabled={busyId === a.id}
+                                onClick={() => toggleFav(a)}
+                                aria-pressed={a.isFavorite}
+                              >
+                                <ThumbUp size={16} filled={a.isFavorite} />
+                                {t("მომწონს", "Like")}
                               </button>
                             )}
-                          </>
-                        ) : (
-                          <>
-                            <ShareMenu title={a.title} />
-                            {isDoctor && !a.isInterested && (
+                            {isDoctor && (
                               <button
-                                className="btn btn-primary btn-sm"
+                                type="button"
+                                className={`fb-rsvp${interestedSoft ? " active interested" : ""}`}
+                                disabled={busyId === a.id}
+                                onClick={() => {
+                                  if (going) return;
+                                  void toggleFav(a);
+                                }}
+                                aria-pressed={interestedSoft}
+                              >
+                                <Star size={16} filled={interestedSoft} />
+                                {t("დაინტერესებული", "Interested")}
+                              </button>
+                            )}
+                            {isDoctor && (
+                              <button
+                                type="button"
+                                className={`fb-rsvp${going ? " active going" : ""}`}
                                 disabled={busyId === a.id}
                                 onClick={() => toggleInterest(a)}
+                                aria-pressed={going}
                               >
-                                {busyId === a.id ? "..." : t("რეგისტრაცია", "Register")}
+                                <Check size={16} />
+                                {going ? t("მივდივარ", "Going") : t("მივდივარ", "Going")}
                               </button>
                             )}
-                            {isDoctor && a.isInterested && (
-                              <span className="reg-inline">
-                                <Check size={14} /> {t("დარეგისტრირებული", "Registered")}
-                              </span>
+                            {mineTab && a.hasGroupChat && (
+                              <button type="button" className="fb-rsvp" onClick={() => navigate("/chat")}>
+                                <Chat size={16} /> {t("ჩატი", "Chat")}
+                              </button>
                             )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </article>
+                            <ShareMenu
+                              title={a.title}
+                              className="fb-rsvp"
+                              label={t("გაზიარება", "Share")}
+                            />
+                          </div>
+                        </div>
+                      </article>
+                    );
+
+                    const nodes = [card];
+                    feedIndex += 1;
+                    /* Insert a Sponsored card every 3 trainings (Facebook feed style). */
+                    if (!mineTab && sponsored.length > 0 && feedIndex % 3 === 0) {
+                      const ad = sponsored[(Math.floor(feedIndex / 3) - 1) % sponsored.length];
+                      nodes.push(
+                        <SponsoredEventCard key={`sponsored-${key}-${a.id}-${ad.id}`} item={ad} />
+                      );
+                    }
+                    return nodes;
+                  })}
+                </div>
+              </section>
               );
             })}
           </div>
@@ -626,105 +766,29 @@ export default function Announcements() {
       )}
 
       {modalAnnouncement && (
-        <div className="modal" onClick={() => setModalId(null)}>
-          <div className="box train-detail-modal" onClick={stopCard}>
-            <div className="mhead">
-              <div>
-                <h3>{modalAnnouncement.title}</h3>
-                <p>
-                  {modalAnnouncement.centerUserId
-                    ? (
-                      <Link to={`/centers/${modalAnnouncement.centerUserId}`} onClick={() => setModalId(null)}>
-                        {modalAnnouncement.centerName}
-                      </Link>
-                    )
-                    : modalAnnouncement.centerName}
-                </p>
-              </div>
-              <button type="button" className="xbtn" aria-label={t("დახურვა", "Close")} onClick={() => setModalId(null)}>×</button>
-            </div>
-
-            <div className="train-detail-media">
-              {modalAnnouncement.imageUrl
-                ? <img src={modalAnnouncement.imageUrl} alt="" />
-                : <MediaPlaceholder title={modalAnnouncement.title} subtitle={modalAnnouncement.centerName} variant={modalAnnouncement.points > 0 ? "teal" : "navy"} />}
-            </div>
-
-            <div className="meta" style={{ marginBottom: 12 }}>
-              {modalAnnouncement.startDate && (
-                <div className="row">
-                  <Calendar size={15} /> {fmtDateTime(modalAnnouncement.startDate)}
-                </div>
-              )}
-              <div className="row">
-                {modalAnnouncement.format === "ონლაინ" ? <Mail size={15} /> : <Pin size={15} />}
-                {placeLabel(modalAnnouncement)}
-              </div>
-            </div>
-
-            {(modalAnnouncement.description || modalAnnouncement.shortDescription) && (
-              <p className="train-detail-desc">{modalAnnouncement.description || modalAnnouncement.shortDescription}</p>
-            )}
-
-            <div className="train-details-grid">
-              {modalAnnouncement.price > 0 && (
-                <div>
-                  <span>{t("ფასი", "Price")}</span>
-                  <b>{modalAnnouncement.price} ₾</b>
-                </div>
-              )}
-              {modalAnnouncement.duration && (
-                <div>
-                  <span>{t("ხანგრძლივობა", "Duration")}</span>
-                  <b>{modalAnnouncement.duration}</b>
-                </div>
-              )}
-              {modalAnnouncement.language && (
-                <div>
-                  <span>{t("ენა", "Language")}</span>
-                  <b>{modalAnnouncement.language}</b>
-                </div>
-              )}
-              {modalAnnouncement.registrationDeadline && (
-                <div>
-                  <span>{t("ვადა", "Deadline")}</span>
-                  <b>{fmtDate(modalAnnouncement.registrationDeadline)}</b>
-                </div>
-              )}
-            </div>
-
-            {(mineTab || modalAnnouncement.isInterested) && renderMeetingAccess(modalAnnouncement)}
-
-            <div className="train-detail-footer">
-              {mineTab && modalAnnouncement.hasGroupChat && (
-                <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate("/chat")}>
-                  <Chat size={14} /> {t("ჩატი", "Chat")}
-                </button>
-              )}
-              {isDoctor && (mineTab || modalAnnouncement.isInterested) && (
-                <button
-                  type="button"
-                  className="btn btn-text btn-sm"
-                  style={{ color: "var(--danger)" }}
-                  disabled={busyId === modalAnnouncement.id}
-                  onClick={() => toggleInterest(modalAnnouncement)}
-                >
-                  {busyId === modalAnnouncement.id ? "..." : t("რეგისტრაციის გაუქმება", "Cancel registration")}
-                </button>
-              )}
-              {isDoctor && !modalAnnouncement.isInterested && (
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  disabled={busyId === modalAnnouncement.id}
-                  onClick={() => toggleInterest(modalAnnouncement)}
-                >
-                  {busyId === modalAnnouncement.id ? "..." : t("რეგისტრაცია", "Register")}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <EventDetailModal
+          a={modalAnnouncement}
+          likes={likeCounts[modalAnnouncement.id] ?? modalAnnouncement.interestedCount}
+          isDoctor={isDoctor}
+          mineTab={mineTab}
+          busyId={busyId}
+          whenFull={
+            modalAnnouncement.startDate
+              ? fmtDateTime(modalAnnouncement.startDate)
+              : t("თარიღი მითითებული არ არის", "Date not set")
+          }
+          placeLabel={placeLabel(modalAnnouncement)}
+          dateParts={dateParts(modalAnnouncement.startDate)}
+          fmtDate={fmtDate}
+          meetingAccess={(mineTab || modalAnnouncement.isInterested)
+            ? renderMeetingAccess(modalAnnouncement)
+            : null}
+          onClose={() => setModalId(null)}
+          onStop={stopCard}
+          onLike={() => { void toggleFav(modalAnnouncement); }}
+          onGoing={() => { void toggleInterest(modalAnnouncement); }}
+          onChat={() => navigate("/chat")}
+        />
       )}
     </div>
   );

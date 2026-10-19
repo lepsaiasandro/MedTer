@@ -63,6 +63,19 @@ export const Funnel = (p: IconProps) => <Icon sw={2} {...p}><path d="M3 4h18l-7 
 export const Bookmark = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
   <svg width={p.size ?? 17} height={p.size ?? 17} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
 );
+export const Star = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
+  <svg width={p.size ?? 18} height={p.size ?? 18} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m12 3 2.7 5.5 6 .9-4.4 4.3 1 6.1L12 17.3 6.7 19.8l1-6.1L3.4 9.4l6-.9z" />
+  </svg>
+);
+/** Facebook-style thumbs-up (like). */
+export const ThumbUp = ({ filled, ...p }: IconProps & { filled?: boolean }) => (
+  <svg width={p.size ?? 18} height={p.size ?? 18} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth={filled ? 0 : 1.9} strokeLinecap="round" strokeLinejoin="round">
+    {filled
+      ? <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+      : <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />}
+  </svg>
+);
 export const ExternalLink = (p: IconProps) => (
   <Icon sw={2} {...p}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" /></Icon>
 );

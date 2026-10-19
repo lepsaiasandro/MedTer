@@ -5,6 +5,7 @@ import { usePrefs } from "../i18n";
 import api from "../api";
 import { Bell, Chat, ChevronDown, Home, Cap, Sun, Moon, Users, Menu, X } from "./icons";
 import LinearAdBanner from "./LinearAdBanner";
+import GlobalSearch from "./GlobalSearch";
 import logoIcon from "../assets/medter-icon.png";
 
 interface Notif { id: number; text: string; isRead: boolean; createdAt: string; }
@@ -25,6 +26,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const nav: NavItem[] = isGuest
     ? [
         { to: "/", label: t("მთავარი", "Home") },
+        { to: "/announcements", label: t("ტრენინგები", "Trainings") },
         { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
         { to: "/#audience", label: t("ვისთვისაა", "Audience"), full: t("ვისთვისაა", "Who it's for") },
         { to: "/#contact", label: t("კონტაქტი", "Contact") },
@@ -174,6 +176,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const footerLinks = isGuest
     ? [
         { to: "/", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
+        { to: "/announcements", label: t("ტრენინგები", "Trainings"), icon: <Cap size={16} /> },
         { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
       ]
     : [
@@ -206,9 +209,11 @@ export default function Layout({ children }: { children: ReactNode }) {
               const hash = item.to.includes("#") ? item.to.split("#")[1] : "";
               const active = item.to === "/centers"
                 ? location.pathname === "/centers" || location.pathname.startsWith("/centers/")
-                : hash
-                  ? location.pathname === "/" && location.hash === `#${hash}`
-                  : location.pathname === item.to && !location.hash;
+                : item.to === "/announcements"
+                  ? location.pathname === "/announcements"
+                  : hash
+                    ? location.pathname === "/" && location.hash === `#${hash}`
+                    : location.pathname === item.to && !location.hash;
               return (
                 <Link
                   key={item.to}
@@ -226,6 +231,8 @@ export default function Layout({ children }: { children: ReactNode }) {
               );
             })}
           </nav>
+
+          <GlobalSearch />
 
           <div className="top-actions">
             <button className="icon-btn" style={{ fontWeight: 800, fontSize: 12.5 }} onClick={() => setLang(lang === "ka" ? "en" : "ka")} title="Language">
@@ -378,9 +385,11 @@ export default function Layout({ children }: { children: ReactNode }) {
           const hash = item.to.includes("#") ? item.to.split("#")[1] : "";
           const active = item.to === "/centers"
             ? location.pathname === "/centers" || location.pathname.startsWith("/centers/")
-            : hash
-              ? location.pathname === "/" && location.hash === `#${hash}`
-              : location.pathname === item.to && !location.hash;
+            : item.to === "/announcements"
+              ? location.pathname === "/announcements"
+              : hash
+                ? location.pathname === "/" && location.hash === `#${hash}`
+                : location.pathname === item.to && !location.hash;
           return (
             <Link
               key={item.to}
@@ -502,7 +511,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               MedTer
             </div>
             <p>{t(
-              "MedTer აერთიანებს ტრენინგ ცენტრებს ერთ სივრცეში — კონფერენციები, ტრენინგები, უსდ ქულები და სერტიფიკატები ქართველი პროფესიონალებისთვის.",
+              "MedTer აერთიანებს ტრენინგ ცენტრებს ერთ სივრცეში — კონფერენციები, ტრენინგები, უპგ ქულები და სერტიფიკატები ქართველი პროფესიონალებისთვის.",
               "MedTer brings training centers together in one space — conferences, trainings, CPD points and certificates for Georgian professionals."
             )}</p>
           </div>

@@ -476,11 +476,11 @@ export default function MyAnnouncements() {
             <div className="fcard">
               <div className="fcard-head">
                 <span className="num">3</span>
-                <div><h2>{t("რეგისტრაცია და ქულები", "Registration & points")}</h2><p>{t("უსდ ქულა, ფასი და ადგილების ლიმიტი", "CPD points, price and seat limit")}</p></div>
+                <div><h2>{t("რეგისტრაცია და ქულები", "Registration & points")}</h2><p>{t("უპგ ქულა, ფასი და ადგილების ლიმიტი", "CPD points, price and seat limit")}</p></div>
               </div>
               <div className="field-grid">
                 <div className="field">
-                  <label>{t("უსდ ქულა", "CPD points")} <span className="req">*</span></label>
+                  <label>{t("უპგ ქულა", "CPD points")} <span className="req">*</span></label>
                   <input className="control" type="number" min={0} placeholder={t("მაგ: 20", "e.g. 20")} value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} />
                   <div className="hint">{t("უწყვეტი სამედიცინო განათლების ქულა", "Continuing medical education points")}</div>
                 </div>
@@ -505,7 +505,7 @@ export default function MyAnnouncements() {
             <div className="fcard">
               <div className="fcard-head">
                 <span className="num">4</span>
-                <div><h2>{t("ბანერი", "Banner")}</h2><p>{t("მთავარი სურათი, რომელიც ბარათსა და გვერდზე გამოჩნდება", "The main image shown on the card and page")}</p></div>
+                <div><h2>{t("ბანერი", "Banner")}</h2><p>{t("1920×1080 (16:9) — მთავარი სურათი ფიდსა და ივენთის გვერდზე", "1920×1080 (16:9) — main image on the feed and event page")}</p></div>
               </div>
               <label
                 className={`dropzone ${drag ? "drag" : ""}`}
@@ -514,12 +514,12 @@ export default function MyAnnouncements() {
                 onDrop={(e) => { e.preventDefault(); setDrag(false); onPickBanner(e.dataTransfer.files?.[0]); }}
               >
                 {form.imageUrl ? (
-                  <img className="dz-preview" src={form.imageUrl} alt="banner" />
+                  <img className="dz-preview dz-preview--banner" src={form.imageUrl} alt="banner" />
                 ) : (
                   <>
                     <div className="dz-ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5M12 3v12" /></svg></div>
                     <div className="dz-t"><b>{t("ატვირთე ფაილი", "Upload a file")}</b> {t("ან ჩააგდე აქ", "or drop it here")}</div>
-                    <div className="dz-d">{t("JPG ან PNG · რეკომ. 1200×630px · მაქს. 5MB", "JPG or PNG · rec. 1200×630px · max 5MB")}</div>
+                    <div className="dz-d">{t("JPG ან PNG · 1920×1080px (16:9) · მაქს. 5MB", "JPG or PNG · 1920×1080px (16:9) · max 5MB")}</div>
                   </>
                 )}
                 <input type="file" accept="image/*" hidden onChange={(e) => onPickBanner(e.target.files?.[0] || undefined)} />
@@ -574,8 +574,8 @@ export default function MyAnnouncements() {
               <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" /></svg> {t("რჩევები კარგი განცხადებისთვის", "Tips for a great announcement")}</h4>
               <ul>
                 <li>{IcCheck} {t("სათაურში მიუთითე კონკრეტული თემა და წელი", "Include a specific topic and year in the title")}</li>
-                <li>{IcCheck} {t("ბანერი მკვეთრი და პროფესიული აირჩიე", "Choose a sharp, professional banner")}</li>
-                <li>{IcCheck} {t("უსდ ქულის სიზუსტე ზრდის ნდობას", "Accurate CPD points build trust")}</li>
+                <li>{IcCheck} {t("ბანერი 1920×1080 (16:9) ატვირთე", "Upload a 1920×1080 (16:9) banner")}</li>
+                <li>{IcCheck} {t("უპგ ქულის სიზუსტე ზრდის ნდობას", "Accurate CPD points build trust")}</li>
               </ul>
             </div>
           </aside>

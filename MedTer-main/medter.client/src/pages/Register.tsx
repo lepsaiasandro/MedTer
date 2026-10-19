@@ -190,7 +190,7 @@ export default function Register() {
       </h1>
       <p className="auth-brand-copy">
         {t(
-          "ტრენინგები, უსდ ქულები და პროფესიული კომუნიკაცია — ერთ სივრცეში.",
+          "ტრენინგები, უპგ ქულები და პროფესიული კომუნიკაცია — ერთ სივრცეში.",
           "Trainings, CPD points and professional communication — in one place."
         )}
       </p>

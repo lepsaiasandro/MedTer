@@ -86,7 +86,7 @@ const PLACEMENT_EXTRAS: Record<"trainings" | "centers", PartnerCreative[]> = {
       brand: "MedTer",
       titleKa: "იპოვე ტრენინგი MedTer-ზე",
       titleEn: "Find a training on MedTer",
-      textKa: "უსდ ქულები, სერტიფიკატები და რეგისტრაცია — ერთ სივრცეში.",
+      textKa: "უპგ ქულები, სერტიფიკატები და რეგისტრაცია — ერთ სივრცეში.",
       textEn: "CPD points, certificates and registration — in one place.",
       ctaKa: "ნახე ტრენინგები",
       ctaEn: "Browse trainings",
@@ -97,7 +97,7 @@ const PLACEMENT_EXTRAS: Record<"trainings" | "centers", PartnerCreative[]> = {
       id: "medter-cpd",
       href: "/announcements?mine=1",
       brand: "MedTer",
-      titleKa: "შენი უსდ ქულები ერთ ადგილას",
+      titleKa: "შენი უპგ ქულები ერთ ადგილას",
       titleEn: "Your CPD points in one place",
       textKa: "დარეგისტრირდი ტრენინგზე და თვალი ადევნე პროგრესს.",
       textEn: "Register for trainings and track your progress.",
@@ -176,6 +176,27 @@ function buildPool(apiItems: PartnerCreative[], placement: BannerPlacement, rand
   return random ? shuffle(unique) : unique;
 }
 
+/** Active partner creatives for feed injection (Sponsored cards). */
+export function useSponsoredCreatives(placement: BannerPlacement = "trainings") {
+  const [items, setItems] = useState<PartnerCreative[]>(() => buildPool([], placement, true));
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get<AdBannerApi[]>("/ads")
+      .then((r) => {
+        if (cancelled) return;
+        setItems(buildPool((r.data || []).map(mapApi), placement, true));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setItems(buildPool([], placement, true));
+      });
+    return () => { cancelled = true; };
+  }, [placement]);
+
+  return items;
+}
+
 /** Full-width partner banner under the top nav.
  *  Use `embedded` + `random` + `placement` on trainings/centers pages. */
 export default function LinearAdBanner({
@@ -227,9 +248,9 @@ export default function LinearAdBanner({
   const logo = partnerLogoUrl(item.brand);
 
   return (
-    <aside className={`partner-strip${embedded ? " partner-strip--embedded" : ""}`} aria-label={t("პარტნიორი", "Partner")}>
+    <aside className={`partner-strip${embedded ? " partner-strip--embedded" : ""}`} aria-label={t("სპონსორირებული", "Sponsored")}>
       <div className="partner-strip-inner">
-        <span className="partner-strip-label">{t("პარტნიორი", "Partner")}</span>
+        <span className="partner-strip-label">{t("სპონსორირებული", "Sponsored")}</span>
         <a
           href={item.href}
           className="partner-strip-card"
