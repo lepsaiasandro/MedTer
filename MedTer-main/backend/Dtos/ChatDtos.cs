@@ -57,6 +57,7 @@ public record TrainingCenterDto(
     int? MyRating,
     int AnnouncementCount = 0,
     int UpcomingCount = 0,
-    IReadOnlyList<string>? Categories = null);
+    IReadOnlyList<string>? Categories = null,
+    IReadOnlyList<string>? Formats = null);
 
 public record RateDto(int Stars);

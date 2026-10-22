@@ -3,9 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import { Calendar, Pin, Search, Check, Bookmark, Cap, Chat, X, ExternalLink, Video } from "../components/icons";
+import { Calendar, Pin, Search, Check, Bookmark, Cap, Chat, X, ExternalLink, Image, Home, Users } from "../components/icons";
 import ShareMenu from "../components/ShareMenu";
-import PointsPanel from "../components/PointsPanel";
 import EmptyState from "../components/EmptyState";
 import AuthRequired from "../components/AuthRequired";
 import { useSponsoredCreatives } from "../components/LinearAdBanner";
@@ -126,6 +125,8 @@ function AnnouncementsFeed() {
   const [modalId, setModalId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
+  const [draft, setDraft] = useState("");
+  const [notes, setNotes] = useState<{ id: number; text: string }[]>([]);
 
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [category, setCategory] = useState(() => searchParams.get("cat") ?? "");
@@ -134,9 +135,8 @@ function AnnouncementsFeed() {
   const [sort, setSort] = useState(() => searchParams.get("sort") || "date");
   const [when, setWhen] = useState<WhenFilter>(() => {
     const w = searchParams.get("when");
-    if (w === "week" || w === "month" || w === "past" || w === "all" || w === "upcoming") return w;
-    // Default: show everything — demo seed dates are often already past.
-    return "all";
+    if (w === "week" || w === "month" || w === "past" || w === "all") return w;
+    return "upcoming";
   });
   const [savedOnly, setSavedOnly] = useState(() => searchParams.get("saved") === "1" || searchParams.get("fav") === "1");
 
@@ -164,6 +164,7 @@ function AnnouncementsFeed() {
     if (!iso) return "";
     const d = new Date(iso);
     if (isNaN(d.getTime())) return "";
+    if (d.getHours() === 0 && d.getMinutes() === 0) return "";
     return d.toLocaleTimeString(lang === "en" ? "en-GB" : "ka-GE", { hour: "2-digit", minute: "2-digit" });
   };
 
@@ -249,7 +250,7 @@ function AnnouncementsFeed() {
         val === null ||
         val === "" ||
         (key === "sort" && val === "date") ||
-        (key === "when" && val === "all") ||
+        (key === "when" && val === "upcoming") ||
         ((key === "saved" || key === "fav") && val !== "1");
       if (drop) next.delete(key);
       else next.set(key, val);
@@ -372,6 +373,10 @@ function AnnouncementsFeed() {
   };
 
   const registeredCount = mineItems.length;
+  const savedCount = items.filter((a) => a.isFavorite).length;
+  const firstName = user?.displayName?.split(" ")[0] ?? "";
+  const upcomingMine = mineItems.filter((a) => !a.startDate || new Date(a.startDate).getTime() >= Date.now()).slice(0, 3);
+  const savedPreview = items.filter((a) => a.isFavorite).slice(0, 3);
   const source = mineTab ? mineItems : items;
 
   const categories = useMemo(() => [...new Set(source.map((a) => a.category).filter(Boolean))] as string[], [source]);
@@ -410,10 +415,11 @@ function AnnouncementsFeed() {
     return [...map.entries()];
   }, [visible]);
 
-  const hasFilters = Boolean(search || category || format || city || savedOnly || when !== "all");
+  const hasFilters = Boolean(search || category || format || city || savedOnly || when !== "upcoming");
+  const onlyPeriodEmpty = !search && !category && !format && !city && !savedOnly && when !== "all";
 
   const clearFilters = () => {
-    setSearch(""); setCategory(""); setFormat(""); setCity(""); setSavedOnly(false); setWhen("all");
+    setSearch(""); setCategory(""); setFormat(""); setCity(""); setSavedOnly(false); setWhen("upcoming");
     writeFilterParams({ q: null, cat: null, format: null, city: null, saved: null, when: null });
   };
 
@@ -421,13 +427,13 @@ function AnnouncementsFeed() {
     if (w === "week") return t("ამ კვირაში", "This week");
     if (w === "month") return t("ამ თვეში", "This month");
     if (w === "past") return t("გასული", "Past");
-    if (w === "upcoming") return t("მომავალი", "Upcoming");
-    return t("ყველა", "All");
+    if (w === "all") return t("ყველა", "All");
+    return t("მომავალი", "Upcoming");
   };
 
   const activeChips: FilterChip[] = [
     search ? { id: "q", label: `\u201C${search.trim()}\u201D`, onClear: () => setSearchQ("") } : null,
-    when !== "all" ? { id: "when", label: whenLabel(when), onClear: () => setWhenQ("all") } : null,
+    when !== "upcoming" ? { id: "when", label: whenLabel(when), onClear: () => setWhenQ("upcoming") } : null,
     category ? { id: "cat", label: category, onClear: () => setCategoryQ("") } : null,
     format ? {
       id: "format",
@@ -443,26 +449,37 @@ function AnnouncementsFeed() {
     return online ? t("ონლაინ", "Online") : (a.city || t("დასწრებით", "In person"));
   };
 
-  const sectionTitle = (key: string, first: Announcement) => {
-    if (key === "nodate") return t("თარიღი მითითებული არ არის", "Date not set");
-    const parts = dateParts(first.startDate);
-    if (!parts) return t("თარიღი მითითებული არ არის", "Date not set");
-    return `${parts.weekday} · ${parts.day} ${parts.month} ${parts.year}`;
-  };
-
-  const deadlineSoon = (iso?: string) => {
-    if (!iso) return false;
-    const t0 = new Date(iso).getTime();
-    if (isNaN(t0)) return false;
-    const now = Date.now();
-    return t0 >= now && t0 - now <= 7 * 24 * 60 * 60 * 1000;
-  };
-
   let feedIndex = 0;
 
+  const postNote = (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = draft.trim();
+    if (!text) return;
+    setNotes((prev) => [{ id: Date.now(), text }, ...prev]);
+    setDraft("");
+  };
+
   return (
-    <div className="announcements-layout">
-      <div className="announcements-main">
+    <div className="social-feed">
+      <aside className="social-nav">
+        <button type="button" className={!mineTab && !savedOnly ? "on" : ""} onClick={() => { setTab(false); setSavedOnlyQ(false); }}>
+          <Home size={16} /> {t("ფიდი", "Feed")}
+        </button>
+        <Link to="/centers"><Users size={16} /> {t("ცენტრები", "Centers")}</Link>
+        <button type="button" className={mineTab ? "on" : ""} onClick={() => { setSavedOnlyQ(false); setTab(true); }}>
+          <Cap size={16} /> {t("ჩემი ტრენინგები", "My trainings")}
+          <em>{registeredCount}</em>
+        </button>
+        <button type="button" className={!mineTab && savedOnly ? "on" : ""} onClick={() => { setTab(false); setSavedOnlyQ(true); }}>
+          <Bookmark size={16} /> {t("შენახული", "Saved")}
+          <em>{savedCount}</em>
+        </button>
+        <button type="button" onClick={() => { setTab(false); setSavedOnlyQ(false); setWhenQ("all"); }}>
+          <Chat size={16} /> {t("აქტივობა", "Activity")}
+        </button>
+      </aside>
+
+      <div className="social-main">
         {flash && (
           <div className={`train-flash train-flash--${flash.kind}`} role="status">
             <div className="train-flash-icon">
@@ -487,43 +504,39 @@ function AnnouncementsFeed() {
           </div>
         )}
 
-        <div className="page-head events-page-head">
-          <div className="h-text">
-            <h1>{mineTab ? t("ჩემი ტრენინგები", "My Trainings") : t("ფიდი", "Feed")}</h1>
-            <p>
-              {mineTab
-                ? t("შენი რეგისტრაციები — თარიღი, ლინკი და დეტალები", "Your registrations — dates, links and details")
-                : t("იპოვე ტრენინგი და დარეგისტრირდი", "Find a training and register")}
-            </p>
-          </div>
-        </div>
-
-        {isDoctor && (
-          <div className="segment" style={{ marginBottom: 16 }}>
-            <button type="button" className={!mineTab ? "active" : ""} onClick={() => setTab(false)}>
-              {t("ყველა", "All")}
-            </button>
-            <button type="button" className={mineTab ? "active" : ""} onClick={() => setTab(true)}>
-              {t("ჩემი", "Mine")}
-              <span className="count">{registeredCount}</span>
-            </button>
-          </div>
-        )}
-
-        {!mineTab && (
-          <div className="when-chips" role="group" aria-label={t("პერიოდი", "Period")}>
-            {(["all", "upcoming", "week", "month", "past"] as WhenFilter[]).map((w) => (
-              <button
-                key={w}
-                type="button"
-                className={`when-chip${when === w ? " active" : ""}`}
-                onClick={() => setWhenQ(w)}
-              >
-                {whenLabel(w)}
+        <form className="social-compose" onSubmit={postNote}>
+          <span className="dir-av social-me">{(user?.displayName || "?").charAt(0)}</span>
+          <div>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={t(`რას ფიქრობს, ${firstName}?`, `What's on your mind, ${firstName}?`)}
+              aria-label={t("პოსტი", "Post")}
+            />
+            <div className="social-compose-actions">
+              <button type="button"><Image size={15} /> {t("ფოტო", "Photo")}</button>
+              <button type="button" onClick={() => setDraft((v) => v || t("ტრენინგი: ", "Training: "))}>
+                <Cap size={15} /> {t("ტრენინგი", "Training")}
               </button>
-            ))}
+              <button type="button" onClick={() => setDraft((v) => v.endsWith("?") ? v : `${v}?`)}>
+                <Chat size={15} /> {t("კითხვა", "Question")}
+              </button>
+            </div>
           </div>
-        )}
+        </form>
+
+        {notes.map((note) => (
+          <article key={note.id} className="social-post">
+            <header>
+              <span className="dir-av social-me">{(user?.displayName || "?").charAt(0)}</span>
+              <div>
+                <b>{user?.displayName}</b>
+                <span>{t("ახლა · საჯარო", "Just now · Public")}</span>
+              </div>
+            </header>
+            <p>{note.text}</p>
+          </article>
+        ))}
 
         <FilterBar
           collapsible
@@ -636,16 +649,20 @@ function AnnouncementsFeed() {
         ) : visible.length === 0 ? (
           <EmptyState
             icon={<Search size={42} sw={1.6} />}
-            title={t("ვერაფერი მოიძებნა", "Nothing found")}
+            title={
+              onlyPeriodEmpty
+                ? t("ამ პერიოდში ტრენინგი არ არის", "No trainings in this period")
+                : t("ვერაფერი მოიძებნა", "Nothing found")
+            }
             text={
-              when !== "all" && source.length > 0
-                ? t("ამ პერიოდში ტრენინგი არ არის — სცადე ყველა.", "No trainings in this period — try All.")
+              onlyPeriodEmpty
+                ? t("ნახე ყველა ტრენინგი ან შეცვალე პერიოდი.", "View all trainings or change the period.")
                 : t("შეცვალე ფილტრები ან პერიოდი.", "Try different filters or period.")
             }
             action={
-              when !== "all" && source.length > 0 ? (
+              onlyPeriodEmpty ? (
                 <button className="btn btn-primary btn-sm" onClick={() => setWhenQ("all")}>
-                  {t("ყველას ნახვა", "Show all")}
+                  {t("ყველას ნახვა", "View all")}
                 </button>
               ) : (
                 <button className="btn btn-ghost btn-sm" onClick={clearFilters}>
@@ -658,26 +675,17 @@ function AnnouncementsFeed() {
           <div className="events-feed fb-events">
             {grouped.map(([key, list]) => (
               <section key={key} className="events-day">
-                <h2 className="events-day-title">{sectionTitle(key, list[0])}</h2>
                 <div className="events-day-list">
                   {list.flatMap((a) => {
-                    const online = a.format === "ონლაინ";
                     const place = placeLabel(a);
                     const going = mineTab || a.isInterested;
-                    const parts = dateParts(a.startDate);
                     const bannerUrl = pickCardBanner(a.id, a.imageUrl);
                     const time = fmtTime(a.startDate);
-                    const whenLine = [
-                      parts ? `${parts.weekday}` : null,
-                      time || null,
-                      a.category || null,
-                    ].filter(Boolean).join(" · ");
-                    const showDeadline = a.registrationDeadline && !going && deadlineSoon(a.registrationDeadline);
 
                     const card = (
                       <article
                         key={a.id}
-                        className={`fb-event${going ? " is-going" : ""}${a.isFavorite ? " is-saved" : ""}`}
+                        className="social-post"
                         onClick={() => setModalId(a.id)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
@@ -688,116 +696,79 @@ function AnnouncementsFeed() {
                         role="button"
                         tabIndex={0}
                       >
-                        <div className="fb-event-cover" aria-hidden="true">
-                          <img src={bannerUrl} alt="" loading="lazy" />
-                          <div className="fb-event-datechip">
-                            {parts ? (
-                              <>
-                                <span className="fb-event-month">{parts.month}</span>
-                                <span className="fb-event-day">{parts.day}</span>
-                              </>
-                            ) : (
-                              <>
-                                <span className="fb-event-month">—</span>
-                                <span className="fb-event-day"><Calendar size={16} /></span>
-                              </>
-                            )}
+                        <header>
+                          <span className="dir-av" style={{ background: "#3b82f6" }}>
+                            {(a.centerName.match(/[A-Z]/g) || [a.centerName.slice(0, 1)]).slice(0, 2).join("")}
+                          </span>
+                          <div>
+                            <b>
+                              {a.centerUserId ? (
+                                <Link to={`/centers/${a.centerUserId}`} onClick={stopCard}>{a.centerName}</Link>
+                              ) : a.centerName}
+                              <Check size={13} />
+                            </b>
+                            <span>{t("საჯარო განცხადება", "Public post")}</span>
                           </div>
-                        </div>
-
-                        <div className="fb-event-body">
-                          {whenLine && <div className="fb-event-when">{whenLine}</div>}
-                          <h3 className="fb-event-title">{a.title}</h3>
-
-                          <div className="fb-event-host">
-                            {t("ორგანიზატორი:", "Hosted by")}{" "}
-                            {a.centerUserId ? (
-                              <Link to={`/centers/${a.centerUserId}`} onClick={stopCard}>{a.centerName}</Link>
-                            ) : (
-                              <span>{a.centerName}</span>
-                            )}
-                          </div>
-
-                          <div className="fb-event-place">
-                            {online ? <Video size={14} /> : <Pin size={14} />}
-                            <span>{place}</span>
-                            {a.price > 0 && (
-                              <>
-                                <span className="fb-event-dot">·</span>
-                                <span>{a.price} ₾</span>
-                              </>
-                            )}
-                            {a.points > 0 && (
-                              <>
-                                <span className="fb-event-dot">·</span>
-                                <span>{a.points} {t("ქულა", "pts")}</span>
-                              </>
-                            )}
-                            {typeof a.seats === "number" && a.seats > 0 && !going && (
-                              <>
-                                <span className="fb-event-dot">·</span>
-                                <span>{a.seats} {t("ადგილი", "seats")}</span>
-                              </>
-                            )}
-                          </div>
-
-                          {showDeadline && (
-                            <div className="fb-event-deadline">
-                              {t("რეგისტრაციის ვადა:", "Register by:")} {fmtDate(a.registrationDeadline)}
+                        </header>
+                        {(a.shortDescription || a.description) && (
+                          <p className="social-copy">
+                            {a.shortDescription || a.description}
+                            {a.category && <em> #{a.category.replace(/\s+/g, "_")}</em>}
+                          </p>
+                        )}
+                        <div className="social-media">
+                          <img src={bannerUrl} alt="" />
+                          <div className="social-embed" onClick={stopCard}>
+                            <div className="social-kicker">
+                              {t("ტრენინგი", "Training")}{a.category ? ` · ${a.category}` : ""}
                             </div>
-                          )}
-
-                          {(going || a.interestedCount > 0) && (
-                            <div className="fb-event-social">
-                              <span>
-                                {a.interestedCount} {t("მიდის", "going")}
-                              </span>
-                            </div>
-                          )}
-
-                          {going && (a.meetingAccess || a.city) && (
-                            <div className="fb-event-access" onClick={stopCard}>
-                              {renderMeetingAccess(a)}
-                            </div>
-                          )}
-
-                          <div className="fb-event-actions" onClick={stopCard}>
+                            <h3>{a.title}</h3>
+                            <p>
+                              {[fmtDate(a.startDate), time, a.duration, a.points > 0 ? `${a.points} ${t("ქულა", "pts")}` : null]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                            {typeof a.seats === "number" && a.seats > 0 && (
+                              <div className="social-seats">
+                                <i style={{ width: `${Math.min(100, Math.round((a.interestedCount / a.seats) * 100))}%` }} />
+                                <span>{a.interestedCount} / {a.seats} {t("დაკავებული", "filled")}</span>
+                              </div>
+                            )}
                             {isDoctor && (
                               <button
                                 type="button"
-                                className={`fb-rsvp fb-rsvp-primary${going ? " active going" : ""}`}
+                                className="btn btn-primary btn-sm"
                                 disabled={busyId === a.id}
                                 onClick={() => toggleInterest(a)}
-                                aria-pressed={going}
                               >
-                                <Check size={16} />
-                                {going ? t("რეგისტრირებული", "Registered") : t("რეგისტრაცია", "Register")}
+                                {going ? t("რეგისტრირებული ხარ", "Registered") : t("დარეგისტრირება", "Register")}
                               </button>
                             )}
-                            {isDoctor && (
-                              <button
-                                type="button"
-                                className={`fb-rsvp${a.isFavorite ? " active saved" : ""}`}
-                                disabled={busyId === a.id}
-                                onClick={() => toggleSaved(a)}
-                                aria-pressed={a.isFavorite}
-                              >
-                                <Bookmark size={16} filled={a.isFavorite} />
-                                {a.isFavorite ? t("შენახული", "Saved") : t("შენახვა", "Save")}
-                              </button>
-                            )}
-                            {mineTab && a.hasGroupChat && (
-                              <button type="button" className="fb-rsvp" onClick={() => navigate("/chat")}>
-                                <Chat size={16} /> {t("ჩატი", "Chat")}
-                              </button>
-                            )}
-                            <ShareMenu
-                              title={a.title}
-                              className="fb-rsvp"
-                              label={t("გაზიარება", "Share")}
-                            />
                           </div>
                         </div>
+                        <div className="social-stats">
+                          <span>{a.interestedCount}</span>
+                          <span>{a.points > 0 ? `${a.points} ${t("ქულა", "pts")}` : place}</span>
+                        </div>
+                        <div className="social-actions" onClick={stopCard}>
+                          {isDoctor && (
+                            <button type="button" onClick={() => toggleInterest(a)} disabled={busyId === a.id}>
+                              <Check size={15} /> {going ? t("რეგისტრირებული", "Registered") : t("მონიშვნა", "Interested")}
+                            </button>
+                          )}
+                          <button type="button" onClick={() => setModalId(a.id)}>
+                            <Chat size={15} /> {t("კომენტარი", "Comment")}
+                          </button>
+                          <ShareMenu title={a.title} label={t("გაზიარება", "Share")} />
+                          {isDoctor && (
+                            <button type="button" onClick={() => toggleSaved(a)} disabled={busyId === a.id}>
+                              <Bookmark size={15} filled={a.isFavorite} /> {a.isFavorite ? t("შენახული", "Saved") : t("შენახვა", "Save")}
+                            </button>
+                          )}
+                        </div>
+                        {going && (a.meetingAccess || a.city) && (
+                          <div className="fb-event-access" onClick={stopCard}>{renderMeetingAccess(a)}</div>
+                        )}
                       </article>
                     );
 
@@ -818,11 +789,40 @@ function AnnouncementsFeed() {
         )}
       </div>
 
-      {isDoctor && (
-        <aside className="announcements-aside">
-          <PointsPanel />
-        </aside>
-      )}
+      <aside className="social-rail">
+        <section>
+          <header>
+            <b>{t("ჩემი მომავალი ტრენინგები", "My upcoming trainings")}</b>
+            <button type="button" onClick={() => setTab(true)}>{t("ყველა", "All")}</button>
+          </header>
+          {upcomingMine.length === 0 ? (
+            <p>{t("ჯერ არ გაქვს დაგეგმილი ტრენინგი.", "You don't have an upcoming training yet.")}</p>
+          ) : upcomingMine.map((a) => (
+            <button key={a.id} type="button" className="social-mini" onClick={() => setModalId(a.id)}>
+              <span className="dir-av">{(a.centerName.match(/[A-Z]/g) || ["T"]).slice(0, 2).join("")}</span>
+              <span>
+                <b>{a.title}</b>
+                <em>{[fmtDate(a.startDate), a.city || a.format].filter(Boolean).join(" · ")}</em>
+              </span>
+            </button>
+          ))}
+        </section>
+        <section>
+          <header>
+            <b>{t("შენახული", "Saved")}</b>
+          </header>
+          {savedPreview.length === 0 ? (
+            <p>{t("ჯერ არაფერი შეგინახავს. კომენტარები, ლაიქები და შენახვა აქ გამოჩნდება.", "Nothing saved yet. Comments, likes and saves will show up here.")}</p>
+          ) : savedPreview.map((a) => (
+            <button key={a.id} type="button" className="social-mini" onClick={() => setModalId(a.id)}>
+              <span>
+                <b>{a.title}</b>
+                <em>{a.centerName}</em>
+              </span>
+            </button>
+          ))}
+        </section>
+      </aside>
 
       {modalAnnouncement && (
         <EventDetailModal

@@ -4,7 +4,7 @@ import * as signalR from "@microsoft/signalr";
 import api, { API_BASE } from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import { ArrowLeft, Plus, Search, Send, Users, X } from "../components/icons";
+import { ArrowLeft, Paperclip, Plus, Search, Send, Smile, Users, X } from "../components/icons";
 import { matchesSearch } from "../lib/search";
 
 interface ChatGroup {
@@ -45,6 +45,36 @@ interface CreatableAnnouncement {
 
 const RECENT_KEY = "medter_group_recent";
 const MAX_RECENT = 8;
+const AVATAR_COLORS = ["#3b82f6", "#f59e0b", "#8b5cf6", "#14b8a6", "#ef4444", "#06b6d4"];
+
+function colorFor(id: string) {
+  let n = 0;
+  for (let i = 0; i < id.length; i++) n = (n + id.charCodeAt(i)) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[n];
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return (parts[0] || "?").slice(0, 2).toUpperCase();
+}
+
+function clock(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("ka-GE", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+}
+
+const MONTHS_KA = ["იან", "თებ", "მარ", "აპრ", "მაი", "ივნ", "ივლ", "აგვ", "სექ", "ოქტ", "ნოე", "დეკ"];
+const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function dayLabel(iso: string, lang: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const months = lang === "en" ? MONTHS_EN : MONTHS_KA;
+  return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
 
 const sortByRecent = (list: ChatGroup[]) =>
   [...list].sort((a, b) => new Date(b.lastMessageAt ?? 0).getTime() - new Date(a.lastMessageAt ?? 0).getTime());
@@ -66,7 +96,7 @@ const saveRecentIds = (ids: number[]) => {
 
 export default function Chat() {
   const { user } = useAuth();
-  const { t } = usePrefs();
+  const { t, lang } = usePrefs();
   const location = useLocation();
   const preselectId = (location.state as { groupId?: number } | null)?.groupId ?? null;
 
@@ -80,6 +110,7 @@ export default function Chat() {
   const [searching, setSearching] = useState(false);
   const [recentIds, setRecentIds] = useState<number[]>(loadRecentIds);
   const [createOpen, setCreateOpen] = useState(false);
+  const [tab, setTab] = useState<"all" | "unread" | "groups">("all");
   const [creatable, setCreatable] = useState<CreatableAnnouncement[]>([]);
   const [creating, setCreating] = useState(false);
 
@@ -221,9 +252,14 @@ export default function Chat() {
     }
   };
 
+  const tabbed = useMemo(() => {
+    if (tab === "unread") return groups.filter((g) => (g.unreadCount ?? 0) > 0);
+    return groups;
+  }, [groups, tab]);
+
   const filtered = useMemo(
-    () => groups.filter((g) => matchesSearch(query, [g.name, g.city, g.announcementType, g.lastMessagePreview])),
-    [groups, query]
+    () => tabbed.filter((g) => matchesSearch(query, [g.name, g.city, g.announcementType, g.lastMessagePreview])),
+    [tabbed, query]
   );
 
   const recentGroups = useMemo(() => {
@@ -231,8 +267,8 @@ export default function Chat() {
     return recentIds.map((id) => map.get(id)).filter((g): g is ChatGroup => !!g);
   }, [groups, recentIds]);
 
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const send = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!text.trim() || !active) return;
     await connectionRef.current?.invoke("SendGroupMessage", active.id, text.trim());
     setText("");
@@ -258,12 +294,15 @@ export default function Chat() {
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectGroup(g); } }}
         className={`contact ${active?.id === g.id ? "active" : ""}`}
       >
-        <span className="cav group-av"><Users size={16} /></span>
+        <span className="cav" style={{ background: colorFor(String(g.id)) }}>{initials(g.name)}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className={`cname ${unread > 0 ? "unread" : ""}`} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {g.name}
+          <div className="crow">
+            <div className={`cname ${unread > 0 ? "unread" : ""}`}>
+              {g.name}
+            </div>
+            <span className="ctime">{clock(g.lastMessageAt)}</span>
           </div>
-          <div className="crole" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div className="crole">
             {g.lastMessagePreview || meta(g)}
           </div>
         </div>
@@ -282,8 +321,8 @@ export default function Chat() {
   return (
     <div className={`chat${active ? " show-thread" : ""}`}>
       <div className="chat-aside">
-        <div className="head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <span>{t("ჯგუფები", "Groups")}</span>
+        <div className="head chat-aside-head">
+          <span>{t("ჩათი", "Chat")}</span>
           {isCenter && (
             <button type="button" className="btn btn-primary btn-sm" onClick={openCreate} title={t("ჯგუფის შექმნა", "Create group")}>
               <Plus size={14} /> {t("ახალი", "New")}
@@ -299,7 +338,7 @@ export default function Chat() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => setSearching(true)}
-              placeholder={t("ძებნა", "Search")}
+              placeholder={t("ძებნა საუბრებში", "Search conversations")}
               aria-label={t("ჯგუფების ძებნა", "Search groups")}
             />
             {query && (
@@ -313,6 +352,18 @@ export default function Chat() {
               {t("გაუქმება", "Cancel")}
             </button>
           )}
+        </div>
+
+        <div className="chat-tabs" role="tablist">
+          {([
+            ["all", t("ყველა", "All")],
+            ["unread", t("წაუკითხავი", "Unread")],
+            ["groups", t("ჯგუფები", "Groups")],
+          ] as const).map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
+              {label}
+            </button>
+          ))}
         </div>
 
         <div className="chat-list">
@@ -355,7 +406,15 @@ export default function Chat() {
             </>
           )}
 
-          {groups.length > 0 && !showSearchPanel && groups.map((g) => renderGroup(g))}
+          {groups.length > 0 && !showSearchPanel && (
+            <>
+              <div className="contact-section-label">{tab === "groups" ? t("ჯგუფი", "Group") : t("ჩატები", "Chats")}</div>
+              {(tab === "unread" ? filtered : tabbed).map((g) => renderGroup(g))}
+              {(tab === "unread" ? filtered : tabbed).length === 0 && (
+                <p className="contact-empty">{t("წაუკითხავი არ არის", "No unread chats")}</p>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -373,13 +432,21 @@ export default function Chat() {
               >
                 <ArrowLeft size={18} />
               </button>
-              <span className="cav group-av" style={{ width: 32, height: 32 }}><Users size={14} /></span>
+              <span className="cav" style={{ width: 40, height: 40, background: colorFor(String(active.id)) }}>{initials(active.name)}</span>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{active.name}</div>
+                <div className="chat-title">{active.name}</div>
                 <div className="crole" style={{ fontWeight: 500 }}>{meta(active)}</div>
+              </div>
+              <div className="chat-head-faces" aria-hidden="true">
+                {members.slice(0, 3).map((m) => (
+                  <span key={m.userId} className="cav" style={{ background: colorFor(m.userId) }}>{initials(m.displayName)}</span>
+                ))}
               </div>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowMembers((v) => !v)}>
                 <Users size={14} /> {t("წევრები", "Members")}
+              </button>
+              <button type="button" className="icon-btn" aria-label={t("ძებნა", "Search")} onClick={() => searchInputRef.current?.focus()}>
+                <Search size={16} />
               </button>
             </div>
 
@@ -404,17 +471,58 @@ export default function Chat() {
               {messages.length === 0 && (
                 <p className="contact-empty" style={{ margin: "auto" }}>{t("ჯერ შეტყობინებები არ არის", "No messages yet")}</p>
               )}
-              {messages.map((m) => (
-                <div key={m.id} className={`bubble ${m.senderId === myId ? "me" : "them"}`}>
-                  {m.senderId !== myId && <div className="bubble-name">{m.senderName}</div>}
-                  {m.text}
-                </div>
-              ))}
+              {messages.map((m, i) => {
+                const mine = m.senderId === myId;
+                const prev = messages[i - 1];
+                const showDay = !prev || dayLabel(prev.sentAt, lang) !== dayLabel(m.sentAt, lang);
+                return (
+                  <div key={m.id} className="msg-block">
+                    {showDay && <div className="msg-day">{dayLabel(m.sentAt, lang)}</div>}
+                    <div className={`msg-row ${mine ? "me" : "them"}`}>
+                      {!mine && <span className="cav" style={{ background: colorFor(m.senderId) }}>{initials(m.senderName)}</span>}
+                      <div className={`bubble ${mine ? "me" : "them"}`}>
+                        {!mine && <div className="bubble-name">{m.senderName}</div>}
+                        {m.text}
+                        <div className="bubble-meta">
+                          <span>{clock(m.sentAt)}</span>
+                          {mine && <span className="bubble-read">✓✓</span>}
+                        </div>
+                      </div>
+                      {mine && <span className="cav" style={{ background: colorFor(m.senderId) }}>{initials(m.senderName || user?.displayName || "")}</span>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <form onSubmit={send} className="composer">
-              <input className="control" value={text} onChange={(e) => setText(e.target.value)} placeholder={t("დაწერე შეტყობინება...", "Type a message...")} />
-              <button className="btn btn-primary" aria-label="გაგზავნა"><Send size={18} /></button>
+            <form
+              onSubmit={send}
+              className="composer chat-composer"
+              onKeyDown={(e) => { if (e.key === "Escape") setText(""); }}
+            >
+              <button type="button" className="icon-btn" aria-label={t("ფაილი", "File")} onClick={() => undefined}>
+                <Paperclip size={18} />
+              </button>
+              <textarea
+                className="control"
+                rows={1}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void send();
+                  }
+                }}
+                placeholder={t("დაწერე შეტყობინება...", "Type a message...")}
+              />
+              <button type="button" className="icon-btn" aria-label={t("სმაილი", "Emoji")} onClick={() => setText((v) => `${v}😊`)}>
+                <Smile size={18} />
+              </button>
+              <button className="btn btn-primary chat-send" aria-label={t("გაგზავნა", "Send")}><Send size={18} /></button>
             </form>
+            <div className="chat-hints">
+              Enter — {t("გაგზავნა", "send")} · Shift+Enter — {t("ახალი ხაზი", "new line")} · Esc — {t("ტექსტის გასუფთავება", "clear text")}
+            </div>
           </>
         )}
       </div>
