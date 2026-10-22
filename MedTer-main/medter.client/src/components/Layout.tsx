@@ -34,12 +34,12 @@ export default function Layout({ children }: { children: ReactNode }) {
     : isAdmin
       ? [
           { to: "/", label: t("ადმინი", "Admin"), full: t("ადმინ პანელი", "Admin Panel") },
-          { to: "/announcements", label: t("ფიდი", "Feed") },
+          { to: "/announcements", label: t("ტრენინგები", "Trainings") },
           { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
           { to: "/profile", label: t("პროფილი", "Profile") },
         ]
       : [
-          { to: "/announcements", label: t("ფიდი", "Feed") },
+          { to: "/announcements", label: t("ტრენინგები", "Trainings") },
           { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
           ...(isCenter ? [
             { to: "/dashboard", label: t("დაფა", "Dashboard") },
@@ -173,6 +173,31 @@ export default function Layout({ children }: { children: ReactNode }) {
     : "#";
 
   const homeTo = isGuest || isAdmin ? "/" : "/announcements";
+  const shell: "centers" | "chat" | "feed" | null =
+    location.pathname === "/centers" || location.pathname.startsWith("/centers/")
+      ? "centers"
+      : location.pathname === "/chat"
+        ? "chat"
+        : location.pathname === "/announcements"
+          ? "feed"
+          : null;
+  const shellNav: NavItem[] | null = shell === "centers"
+    ? [
+        { to: user ? "/announcements" : "/", label: t("მთავარი", "Home") },
+        { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
+        { to: "/announcements", label: t("ტრენინგები", "Trainings") },
+        ...(user ? [{ to: "/profile", label: t("ჩემი სერტიფიკატები", "My certificates") }] : []),
+      ]
+    : shell === "feed"
+      ? [
+          { to: "/announcements", label: t("ფიდი", "Feed") },
+          { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
+          { to: user ? "/dashboard" : "/register", label: t("დაფა", "Board") },
+        ]
+      : shell === "chat"
+        ? []
+        : null;
+  const navItems = shellNav ?? nav;
   const footerLinks = isGuest
     ? [
         { to: "/", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
@@ -182,16 +207,16 @@ export default function Layout({ children }: { children: ReactNode }) {
     : isAdmin
       ? [
           { to: "/", label: t("ადმინი", "Admin"), icon: <Home size={16} /> },
-          { to: "/announcements", label: t("ფიდი", "Feed"), icon: <Cap size={16} /> },
+          { to: "/announcements", label: t("ტრენინგები", "Trainings"), icon: <Cap size={16} /> },
           { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
         ]
       : [
-          { to: "/announcements", label: t("ფიდი", "Feed"), icon: <Cap size={16} /> },
+          { to: "/announcements", label: t("ტრენინგები", "Trainings"), icon: <Cap size={16} /> },
           { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
           { to: "/chat", label: t("შეტყობინებები", "Messages"), icon: <Chat size={16} /> },
         ];
   return (
-    <div className="app">
+    <div className={`app${shell ? ` shell-${shell}` : ""}`}>
       <header className="topbar">
         <div className="topbar-inner">
           <button
@@ -206,11 +231,11 @@ export default function Layout({ children }: { children: ReactNode }) {
 
           <Link to={homeTo} className="logo" onClick={() => setNavOpen(false)}>
             <img src={logoIcon} alt="" className="logo-mark-img" />
-            <span className="logo-name">Med<span>Ter</span>.ge</span>
+            <span className="logo-name">{shell ? "MedTer" : <>Med<span>Ter</span>.ge</>}</span>
           </Link>
 
           <nav className="nav" aria-label={t("ძირითადი ნავიგაცია", "Main navigation")}>
-            {nav.map((item) => {
+            {navItems.map((item) => {
               const hash = item.to.includes("#") ? item.to.split("#")[1] : "";
               const active = item.to === "/centers"
                 ? location.pathname === "/centers" || location.pathname.startsWith("/centers/")
@@ -221,7 +246,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                     : location.pathname === item.to && !location.hash;
               return (
                 <Link
-                  key={item.to}
+                  key={`${item.to}-${item.label}`}
                   to={item.to}
                   className={active ? "active" : ""}
                   onClick={() => {
@@ -237,15 +262,19 @@ export default function Layout({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <GlobalSearch />
+          {(!shell || shell === "feed") && <GlobalSearch />}
 
           <div className="top-actions">
-            <button className="icon-btn" style={{ fontWeight: 800, fontSize: 12.5 }} onClick={() => setLang(lang === "ka" ? "en" : "ka")} title="Language">
-              {lang === "ka" ? "EN" : "ქა"}
-            </button>
-            <button className="icon-btn" onClick={toggleTheme} title={t("თემა", "Theme")}>
-              {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
-            </button>
+            {(!shell || shell === "feed") && (
+              <button className="icon-btn lang-btn" style={{ fontWeight: 800, fontSize: 12.5 }} onClick={() => setLang(lang === "ka" ? "en" : "ka")} title="Language">
+                {lang === "ka" ? "EN" : "ქა"}
+              </button>
+            )}
+            {!shell && (
+              <button className="icon-btn theme-btn" onClick={toggleTheme} title={t("თემა", "Theme")}>
+                {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+            )}
 
             {user && (
               <div className="top-actions-mobile-hide">
@@ -267,14 +296,14 @@ export default function Layout({ children }: { children: ReactNode }) {
                   )}
                 </div>
 
-                <Link to="/chat" className="icon-btn" aria-label={t("შეტყობინებები", "Messages")}>
+                <Link to="/chat" className="icon-btn" aria-label={t("შეტყობინებები", "Messages")} hidden={!!shell}>
                   {unreadMsgs > 0 && <span className="dot">{unreadMsgs > 9 ? "9+" : unreadMsgs}</span>}
                   <Chat size={21} />
                 </Link>
               </div>
             )}
 
-            <div className="top-divider" />
+            {!shell && <div className="top-divider" />}
 
             {user ? (
               <div style={{ position: "relative" }}>
@@ -288,7 +317,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                     <span className="name">{user.displayName}</span>
                     <span className="role">{roleLabel}</span>
                   </span>
-                  <ChevronDown size={16} />
+                  {!shell && <ChevronDown size={16} />}
                 </button>
                 {menuOpen && (
                   <>
@@ -386,7 +415,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             <X size={20} />
           </button>
         </div>
-        {nav.map((item) => {
+        {navItems.map((item) => {
           const hash = item.to.includes("#") ? item.to.split("#")[1] : "";
           const active = item.to === "/centers"
             ? location.pathname === "/centers" || location.pathname.startsWith("/centers/")
@@ -397,7 +426,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 : location.pathname === item.to && !location.hash;
           return (
             <Link
-              key={item.to}
+              key={`${item.to}-${item.label}`}
               to={item.to}
               className={active ? "active" : ""}
               onClick={() => {
@@ -508,6 +537,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
       )}
 
+      {!shell && (
       <footer className="footer">
         <div className="footer-inner">
           <div>
@@ -529,6 +559,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
         <div className="copyright">{t("© 2026 MedTer. ყველა უფლება დაცულია.", "© 2026 MedTer. All rights reserved.")}</div>
       </footer>
+      )}
     </div>
   );
 }

@@ -70,8 +70,21 @@ public class TrainingCentersController : ControllerBase
                 g => (IReadOnlyList<string>)g.OrderByDescending(x => x.Count)
                     .ThenBy(x => x.Category)
                     .Select(x => x.Category)
-                    .Take(3)
+                    .Take(6)
                     .ToList());
+
+        var formatRows = await _db.Announcements
+            .AsNoTracking()
+            .Where(a => a.Status == "Published" && a.Format != null && a.Format != "")
+            .GroupBy(a => new { a.CenterUserId, a.Format })
+            .Select(g => new { g.Key.CenterUserId, Format = g.Key.Format! })
+            .ToListAsync();
+
+        var formatsByCenter = formatRows
+            .GroupBy(r => r.CenterUserId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<string>)g.Select(x => x.Format).Distinct().ToList());
 
         var result = centers.Select(c => new TrainingCenterDto(
             c.UserId,
@@ -84,7 +97,8 @@ public class TrainingCentersController : ControllerBase
             myRatings != null && myRatings.TryGetValue(c.UserId, out var stars) ? stars : null,
             c.AnnouncementCount,
             c.UpcomingCount,
-            categoriesByCenter.TryGetValue(c.UserId, out var cats) ? cats : Array.Empty<string>()
+            categoriesByCenter.TryGetValue(c.UserId, out var cats) ? cats : Array.Empty<string>(),
+            formatsByCenter.TryGetValue(c.UserId, out var formats) ? formats : Array.Empty<string>()
         ));
 
         return Ok(result);

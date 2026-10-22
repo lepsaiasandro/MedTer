@@ -252,48 +252,69 @@ public static class DbSeeder
     private static async Task EnsureDemoAnnouncementsAsync(IServiceProvider services)
     {
         var db = services.GetRequiredService<AppDbContext>();
-        if (await db.Announcements.AnyAsync()) return;
-
         var users = services.GetRequiredService<UserManager<ApplicationUser>>();
         var promed = await users.FindByEmailAsync("promed@medter.ge");
         var medlearn = await users.FindByEmailAsync("medlearn@medter.ge");
+        var today = DateTime.UtcNow.Date;
 
-        if (promed is not null)
+        if (!await db.Announcements.AnyAsync())
         {
-            db.Announcements.Add(new Announcement
+            if (promed is not null)
             {
-                Title = "Cardio Update 2026 — გულის უკმარისობის მართვა",
-                Type = "კონფერენცია", Category = "კარდიოლოგია", Format = "დასწრებით",
-                ShortDescription = "ინტენსიური კურსი ECG ინტერპრეტაციასა და გადაუდებელ კარდიოლოგიაზე.",
-                Description = "ინტენსიური კურსი ECG ინტერპრეტაციასა და გადაუდებელ კარდიოლოგიაზე.",
-                City = "თბილისი", Duration = "2 დღე", Language = "ქართული",
-                Points = 20, Price = 0, Seats = 50, Status = "Published",
-                CenterUserId = promed.Id, StartDate = DateTime.UtcNow.Date.AddDays(14)
-            });
-            db.Announcements.Add(new Announcement
+                db.Announcements.Add(new Announcement
+                {
+                    Title = "Cardio Update 2026 — გულის უკმარისობის მართვა",
+                    Type = "კონფერენცია", Category = "კარდიოლოგია", Format = "დასწრებით",
+                    ShortDescription = "ინტენსიური კურსი ECG ინტერპრეტაციასა და გადაუდებელ კარდიოლოგიაზე.",
+                    Description = "ინტენსიური კურსი ECG ინტერპრეტაციასა და გადაუდებელ კარდიოლოგიაზე.",
+                    City = "თბილისი", Duration = "2 დღე", Language = "ქართული",
+                    Points = 20, Price = 0, Seats = 50, Status = "Published",
+                    CenterUserId = promed.Id, StartDate = today.AddDays(14)
+                });
+                db.Announcements.Add(new Announcement
+                {
+                    Title = "შინაგანი მედიცინის განახლება",
+                    Type = "ტრენინგი", Category = "ზოგადი პრაქტიკა", Format = "ონლაინ",
+                    ShortDescription = "თანამედროვე მიდგომები დიაგნოსტიკასა და მკურნალობაში.",
+                    Description = "თანამედროვე მიდგომები დიაგნოსტიკასა და მკურნალობაში.",
+                    Duration = "6 საათი", Language = "ქართული",
+                    Points = 8, Price = 0, Seats = 100, Status = "Published",
+                    CenterUserId = promed.Id, StartDate = today.AddDays(28)
+                });
+            }
+            if (medlearn is not null)
             {
-                Title = "შინაგანი მედიცინის განახლება",
-                Type = "ტრენინგი", Category = "ზოგადი პრაქტიკა", Format = "ონლაინ",
-                ShortDescription = "თანამედროვე მიდგომები დიაგნოსტიკასა და მკურნალობაში.",
-                Description = "თანამედროვე მიდგომები დიაგნოსტიკასა და მკურნალობაში.",
-                Duration = "6 საათი", Language = "ქართული",
-                Points = 8, Price = 0, Seats = 100, Status = "Published",
-                CenterUserId = promed.Id, StartDate = DateTime.UtcNow.Date.AddDays(28)
-            });
+                db.Announcements.Add(new Announcement
+                {
+                    Title = "Emergency Medicine — რეანიმაციის პრაქტიკული ტრენინგი",
+                    Type = "ტრენინგი", Category = "გადაუდებელი მედიცინა", Format = "დასწრებით",
+                    ShortDescription = "პრაქტიკული ტრენინგი BLS/ACLS პროტოკოლებზე.",
+                    Description = "პრაქტიკული ტრენინგი BLS/ACLS პროტოკოლებზე.",
+                    City = "ბათუმი", Duration = "1 დღე", Language = "ქართული",
+                    Points = 16, Price = 0, Seats = 40, Status = "Published",
+                    CenterUserId = medlearn.Id, StartDate = today.AddDays(45)
+                });
+            }
+            await db.SaveChangesAsync();
+            return;
         }
-        if (medlearn is not null)
-        {
-            db.Announcements.Add(new Announcement
-            {
-                Title = "Emergency Medicine — რეანიმაციის პრაქტიკული ტრენინგი",
-                Type = "ტრენინგი", Category = "გადაუდებელი მედიცინა", Format = "დასწრებით",
-                ShortDescription = "პრაქტიკული ტრენინგი BLS/ACLS პროტოკოლებზე.",
-                Description = "პრაქტიკული ტრენინგი BLS/ACLS პროტოკოლებზე.",
-                City = "ბათუმი", Duration = "1 დღე", Language = "ქართული",
-                Points = 16, Price = 0, Seats = 40, Status = "Published",
-                CenterUserId = medlearn.Id, StartDate = DateTime.UtcNow.Date.AddDays(45)
-            });
-        }
+
+        // Keep demo feed usable: if every published demo training is in the past,
+        // roll start dates forward relative to today (idempotent on each boot).
+        var demoCenterIds = new[] { promed?.Id, medlearn?.Id }.Where(id => id != null).Cast<string>().ToList();
+        if (demoCenterIds.Count == 0) return;
+
+        var demo = await db.Announcements
+            .Where(a => a.Status == "Published" && demoCenterIds.Contains(a.CenterUserId))
+            .OrderBy(a => a.Id)
+            .ToListAsync();
+        if (demo.Count == 0) return;
+        if (demo.Any(a => a.StartDate == null || a.StartDate.Value.Date >= today)) return;
+
+        var offsets = new[] { 14, 28, 45 };
+        for (var i = 0; i < demo.Count; i++)
+            demo[i].StartDate = today.AddDays(offsets[Math.Min(i, offsets.Length - 1)]);
+
         await db.SaveChangesAsync();
     }
 

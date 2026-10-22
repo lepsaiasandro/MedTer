@@ -51,6 +51,8 @@ export const Image = (p: IconProps) => <Icon sw={1.6} {...p}><rect x="3" y="3" w
 export const Upload = (p: IconProps) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5M12 3v12" /></Icon>;
 export const Bulb = (p: IconProps) => <Icon sw={2} {...p}><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" /></Icon>;
 export const Send = (p: IconProps) => <Icon sw={2} {...p}><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" /></Icon>;
+export const Smile = (p: IconProps) => <Icon sw={1.8} {...p}><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></Icon>;
+export const Paperclip = (p: IconProps) => <Icon sw={1.8} {...p}><path d="m21.4 11.1-9.2 9.2a5 5 0 0 1-7.1-7.1l9.2-9.2a3.5 3.5 0 0 1 5 5l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5" /></Icon>;
 export const Grid = (p: IconProps) => <Icon sw={2} {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18" /></Icon>;
 export const List = (p: IconProps) => <Icon sw={2} {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></Icon>;
 export const Doc = (p: IconProps) => <Icon sw={2} {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></Icon>;
