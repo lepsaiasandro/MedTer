@@ -39,12 +39,16 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Database — connection string from appsettings or Azure App Settings (ConnectionStrings__Default)
-// Development can use SQLite (Data Source=…) when SQL Server LocalDB is unavailable.
+// Database is optional. With no SQL connection string the site uses a local SQLite file
+// so it can still start. Azure App Service keeps that file under /home.
 var sqlConnection = builder.Configuration.GetConnectionString("Default");
 if (string.IsNullOrWhiteSpace(sqlConnection))
-    throw new InvalidOperationException(
-        "ConnectionStrings:Default is not configured. Set ConnectionStrings__Default (or Connection string 'Default') in Azure App Settings.");
+{
+    var sqliteFile = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME"))
+        ? Path.Combine(Environment.GetEnvironmentVariable("HOME") ?? "/home", "medter.db")
+        : "medter.db";
+    sqlConnection = $"Data Source={sqliteFile}";
+}
 var useSqlite = sqlConnection.Contains("Data Source=", StringComparison.OrdinalIgnoreCase)
     || sqlConnection.Contains("DataSource=", StringComparison.OrdinalIgnoreCase);
 builder.Services.AddDbContext<AppDbContext>(opt =>
@@ -147,8 +151,9 @@ var app = builder.Build();
 
 app.UseForwardedHeaders();
 
-using (var scope = app.Services.CreateScope())
+try
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     // SQL Server migrations are not compatible with SQLite — create schema from the model instead.
     if (db.Database.IsSqlite())
@@ -159,6 +164,10 @@ using (var scope = app.Services.CreateScope())
     var seedDemo = app.Environment.IsDevelopment()
         || app.Configuration.GetValue("Seed:Demo", false);
     await backend.Data.DbSeeder.SeedAsync(scope.ServiceProvider, seedDemo: seedDemo);
+}
+catch (Exception ex)
+{
+    app.Logger.LogError(ex, "Database initialization failed. The site will keep running without it.");
 }
 
 if (app.Environment.IsDevelopment())
