@@ -626,8 +626,7 @@ export default function Profile() {
               <div className="card" style={{ padding: 20 }}>
                 <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>{t("სწრაფი ბმულები", "Quick links")}</h3>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                    <Link to="/dashboard" className="btn btn-primary btn-sm">{t("დაფა", "Dashboard")}</Link>
-                    <Link to="/announcements" className="btn btn-ghost btn-sm">{t("ტრენინგები", "Trainings")}</Link>
+                    <Link to="/announcements" className="btn btn-primary btn-sm">{t("ტრენინგები", "Trainings")}</Link>
                     <Link to="/chat" className="btn btn-ghost btn-sm">{t("შეტყობინებები", "Messages")}</Link>
                   </div>
                   {profile.ratingCount > 0 && (

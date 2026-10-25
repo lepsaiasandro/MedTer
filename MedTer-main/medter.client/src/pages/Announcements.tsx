@@ -6,10 +6,10 @@ import { usePrefs } from "../i18n";
 import { Calendar, Pin, Search, Check, Bookmark, Cap, Chat, X, ExternalLink, Home, Users } from "../components/icons";
 import ShareMenu from "../components/ShareMenu";
 import EmptyState from "../components/EmptyState";
-import AuthRequired from "../components/AuthRequired";
 import { useSponsoredCreatives } from "../components/LinearAdBanner";
 import SponsoredEventCard from "../components/SponsoredEventCard";
 import EventDetailModal from "../components/EventDetailModal";
+import AddTrainingModal from "../components/AddTrainingModal";
 import { FilterBar, FilterSelect, FilterToggle, FilterChips, ResultMeta, SearchField, type FilterChip } from "../components/FilterBar";
 import { matchesSearch } from "../lib/search";
 import { pickCardBanner } from "../lib/cardBanners";
@@ -95,17 +95,6 @@ function matchesWhen(iso: string | undefined, when: WhenFilter) {
 }
 
 export default function Announcements() {
-  const { user } = useAuth();
-  if (!user) {
-    return (
-      <AuthRequired
-        titleKa="ტრენინგების სანახავად ანგარიში გჭირდება"
-        titleEn="You need an account to view trainings"
-        textKa="შექმენი ანგარიში ან შედი — შემდეგ დაინახავ ყველა ტრენინგს."
-        textEn="Create an account or sign in — then you'll see all trainings."
-      />
-    );
-  }
   return <AnnouncementsFeed />;
 }
 
@@ -114,8 +103,10 @@ function AnnouncementsFeed() {
   const { t, lang } = usePrefs();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const isGuest = !user;
   const isDoctor = user?.role === "Doctor";
   const isCenter = user?.role === "TrainingCenter";
+  const askLogin = () => window.dispatchEvent(new Event("medter:open-login"));
   const mineTab = isDoctor && searchParams.get("mine") === "1";
   const justRegistered = searchParams.get("welcome") === "1";
   const sponsored = useSponsoredCreatives("trainings");
@@ -126,6 +117,7 @@ function AnnouncementsFeed() {
   const [modalId, setModalId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [category, setCategory] = useState(() => searchParams.get("cat") ?? "");
@@ -206,12 +198,6 @@ function AnnouncementsFeed() {
   };
 
   useEffect(() => { load(); }, [isDoctor]);
-
-  useEffect(() => {
-    if (searchParams.get("tab") === "centers") {
-      navigate("/centers", { replace: true });
-    }
-  }, [searchParams, navigate]);
 
   useEffect(() => {
     if (!justRegistered) return;
@@ -456,11 +442,11 @@ function AnnouncementsFeed() {
           <Home size={16} /> {t("ფიდი", "Feed")}
         </button>
         <Link to="/centers"><Users size={16} /> {t("ცენტრები", "Centers")}</Link>
-        <button type="button" className={mineTab ? "on" : ""} onClick={() => { setSavedOnlyQ(false); setTab(true); }}>
+        <button type="button" className={mineTab ? "on" : ""} onClick={() => { if (isGuest) { askLogin(); return; } setSavedOnlyQ(false); setTab(true); }}>
           <Cap size={16} /> {t("ჩემი ტრენინგები", "My trainings")}
           <em>{registeredCount}</em>
         </button>
-        <button type="button" className={!mineTab && savedOnly ? "on" : ""} onClick={() => { setTab(false); setSavedOnlyQ(true); }}>
+        <button type="button" className={!mineTab && savedOnly ? "on" : ""} onClick={() => { if (isGuest) { askLogin(); return; } setTab(false); setSavedOnlyQ(true); }}>
           <Bookmark size={16} /> {t("შენახული", "Saved")}
           <em>{savedCount}</em>
         </button>
@@ -499,12 +485,12 @@ function AnnouncementsFeed() {
             <span className="dir-av social-me">{(user?.displayName || "?").charAt(0)}</span>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <div>
-                <strong style={{ color: "#fff", display: "block", marginBottom: 2 }}>{t("ახალი ტრენინგი", "New training")}</strong>
-                <span style={{ color: "#8ea0ba", fontSize: 13, lineHeight: 1.4 }}>
-                  {t("მიუთითე თარიღი, ქულა და ადგილი. ექიმები ფიდზე დაინახავენ.", "Add the date, points and place. Doctors will see it on the feed.")}
+                <strong style={{ color: "var(--text)", display: "block", marginBottom: 2 }}>{t("ახალი ტრენინგი", "New training")}</strong>
+                <span style={{ color: "var(--muted)", fontSize: 13, lineHeight: 1.4 }}>
+                  {t("ფორმა აქვე იხსნება, გვერდს არ ცვლის.", "The form opens here, without leaving the page.")}
                 </span>
               </div>
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate("/dashboard?new=1")}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setAddOpen(true)}>
                 <Cap size={15} /> {t("ტრენინგის დამატება", "Add training")}
               </button>
             </div>
@@ -707,12 +693,12 @@ function AnnouncementsFeed() {
                                 <span>{a.interestedCount} / {a.seats} {t("დაკავებული", "filled")}</span>
                               </div>
                             )}
-                            {isDoctor && (
+                            {(isDoctor || isGuest) && (
                               <button
                                 type="button"
                                 className="btn btn-primary btn-sm"
                                 disabled={busyId === a.id}
-                                onClick={() => toggleInterest(a)}
+                                onClick={() => { if (isGuest) { askLogin(); return; } void toggleInterest(a); }}
                               >
                                 {going ? t("რეგისტრირებული ხარ", "Registered") : t("დარეგისტრირება", "Register")}
                               </button>
@@ -724,17 +710,17 @@ function AnnouncementsFeed() {
                           <span>{a.points > 0 ? `${a.points} ${t("ქულა", "pts")}` : place}</span>
                         </div>
                         <div className="social-actions" onClick={stopCard}>
-                          {isDoctor && (
-                            <button type="button" onClick={() => toggleInterest(a)} disabled={busyId === a.id}>
+                          {(isDoctor || isGuest) && (
+                            <button type="button" onClick={() => { if (isGuest) { askLogin(); return; } void toggleInterest(a); }} disabled={busyId === a.id}>
                               <Check size={15} /> {going ? t("რეგისტრირებული", "Registered") : t("მონიშვნა", "Interested")}
                             </button>
                           )}
-                          <button type="button" onClick={() => setModalId(a.id)}>
+                          <button type="button" onClick={() => { if (isGuest) { askLogin(); return; } setModalId(a.id); }}>
                             <Chat size={15} /> {t("კომენტარი", "Comment")}
                           </button>
                           <ShareMenu title={a.title} label={t("გაზიარება", "Share")} />
-                          {isDoctor && (
-                            <button type="button" onClick={() => toggleSaved(a)} disabled={busyId === a.id}>
+                          {(isDoctor || isGuest) && (
+                            <button type="button" onClick={() => { if (isGuest) { askLogin(); return; } void toggleSaved(a); }} disabled={busyId === a.id}>
                               <Bookmark size={15} filled={a.isFavorite} /> {a.isFavorite ? t("შენახული", "Saved") : t("შენახვა", "Save")}
                             </button>
                           )}
@@ -766,7 +752,7 @@ function AnnouncementsFeed() {
         <section>
           <header>
             <b>{t("ჩემი მომავალი ტრენინგები", "My upcoming trainings")}</b>
-            <button type="button" onClick={() => setTab(true)}>{t("ყველა", "All")}</button>
+            <button type="button" onClick={() => { if (isGuest) { askLogin(); return; } setTab(true); }}>{t("ყველა", "All")}</button>
           </header>
           {upcomingMine.length === 0 ? (
             <p>{t("ჯერ არ გაქვს დაგეგმილი ტრენინგი.", "You don't have an upcoming training yet.")}</p>
@@ -800,7 +786,7 @@ function AnnouncementsFeed() {
       {modalAnnouncement && (
         <EventDetailModal
           a={modalAnnouncement}
-          isDoctor={isDoctor}
+          isDoctor={isDoctor || isGuest}
           mineTab={mineTab}
           busyId={busyId}
           whenFull={
@@ -816,9 +802,15 @@ function AnnouncementsFeed() {
             : null}
           onClose={() => setModalId(null)}
           onStop={stopCard}
-          onSave={() => { void toggleSaved(modalAnnouncement); }}
-          onGoing={() => { void toggleInterest(modalAnnouncement); }}
-          onChat={() => navigate("/chat")}
+          onSave={() => { if (isGuest) { askLogin(); return; } void toggleSaved(modalAnnouncement); }}
+          onGoing={() => { if (isGuest) { askLogin(); return; } void toggleInterest(modalAnnouncement); }}
+          onChat={() => { if (isGuest) { askLogin(); return; } navigate("/chat"); }}
+        />
+      )}
+      {addOpen && (
+        <AddTrainingModal
+          onClose={() => setAddOpen(false)}
+          onSaved={() => { void load({ soft: true }); }}
         />
       )}
     </div>

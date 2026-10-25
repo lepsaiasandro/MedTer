@@ -402,27 +402,27 @@ function CenterHome() {
           <h1>{t("გამარჯობა", "Hello")}, {user?.displayName}</h1>
           <p>{t("განცხადებები, დაინტერესებები და შეტყობინებები ერთ ადგილას.", "Announcements, interest and messages in one place.")}</p>
         </div>
-        <button className="btn btn-primary" onClick={() => navigate("/dashboard")}>
-          {t("დაფა", "Dashboard")}
+        <button className="btn btn-primary" onClick={() => navigate("/announcements")}>
+          {t("ტრენინგები", "Trainings")}
         </button>
       </header>
 
       <div className="stats stats-3 reveal">
-        <button type="button" className="stat action-stat" onClick={() => navigate("/dashboard")}>
+        <button type="button" className="stat action-stat" onClick={() => navigate("/announcements")}>
           <div className="k">
             <span className="ic" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}><Cap size={14} /></span>
             {t("გამოქვეყნებული", "Published")}
           </div>
           <div className="v">{published}</div>
         </button>
-        <button type="button" className="stat action-stat" onClick={() => navigate("/dashboard")}>
+        <button type="button" className="stat action-stat" onClick={() => navigate("/announcements")}>
           <div className="k">
             <span className="ic" style={{ background: "var(--warning-soft)", color: "var(--warning)" }}><Clock size={14} /></span>
             {t("მოლოდინში", "Pending")}
           </div>
           <div className="v">{pending}</div>
         </button>
-        <button type="button" className="stat action-stat" onClick={() => navigate("/dashboard")}>
+        <button type="button" className="stat action-stat" onClick={() => navigate("/announcements")}>
           <div className="k">
             <span className="ic" style={{ background: "var(--teal-soft)", color: "var(--teal)" }}><Users size={14} /></span>
             {t("დაინტერესდა", "Interested")}
@@ -438,7 +438,7 @@ function CenterHome() {
         {drafts.length === 0 ? (
           <div className="dash-empty reveal">
             <p>{t("ყველა განცხადება განახლებულია. შექმენი ახალი ტრენინგი.", "Everything is up to date. Create a new training.")}</p>
-            <button className="btn btn-primary btn-sm" onClick={() => navigate("/dashboard")}>
+            <button className="btn btn-primary btn-sm" onClick={() => navigate("/announcements")}>
               {t("ახალი განცხადება", "New announcement")}
             </button>
           </div>
@@ -450,7 +450,7 @@ function CenterHome() {
                 type="button"
                 className="dash-list-item reveal"
                 style={{ animationDelay: `${i * 50}ms` }}
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/announcements")}
               >
                 <span className="dash-list-ic"><Cap size={18} /></span>
                 <span className="dash-list-body">

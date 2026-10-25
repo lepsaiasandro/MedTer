@@ -51,9 +51,7 @@ export default function GlobalSearch() {
     if (loaded) return;
     try {
       const centersReq = api.get<CenterHit[]>("/training-centers");
-      const trainingsReq = user
-        ? api.get<AnnouncementHit[]>("/announcements").catch(() => ({ data: [] as AnnouncementHit[] }))
-        : Promise.resolve({ data: [] as AnnouncementHit[] });
+      const trainingsReq = api.get<AnnouncementHit[]>("/announcements").catch(() => ({ data: [] as AnnouncementHit[] }));
       const [cRes, tRes] = await Promise.all([centersReq, trainingsReq]);
       setCenters(cRes.data);
       setTrainings(tRes.data);
@@ -135,10 +133,8 @@ export default function GlobalSearch() {
     setQuery("");
     if (hit.kind === "training") {
       navigate(`/announcements?q=${encodeURIComponent(hit.item.title)}`);
-    } else if (user) {
-      navigate(`/centers/${hit.item.userId}`);
     } else {
-      navigate(`/centers?q=${encodeURIComponent(hit.item.name)}`);
+      navigate(`/centers/${hit.item.userId}`);
     }
   };
 
@@ -146,15 +142,7 @@ export default function GlobalSearch() {
     const q = query.trim();
     if (!q) return;
     setOpen(false);
-    if (!user) {
-      navigate(`/announcements?q=${encodeURIComponent(q)}`);
-      return;
-    }
-    if (hits.trainings.length > 0 || hits.centers.length === 0) {
-      navigate(`/announcements?q=${encodeURIComponent(q)}`);
-    } else {
-      navigate(`/centers?q=${encodeURIComponent(q)}`);
-    }
+    navigate(`/announcements?q=${encodeURIComponent(q)}`);
     setQuery("");
   };
 
@@ -205,26 +193,7 @@ export default function GlobalSearch() {
             <div className="global-search-empty">{t("იტვირთება…", "Loading…")}</div>
           ) : (
             <>
-              {!user && (
-                <button
-                  type="button"
-                  className="global-search-gate"
-                  onClick={() => {
-                    setOpen(false);
-                    navigate(`/announcements?q=${encodeURIComponent(query.trim())}`);
-                  }}
-                >
-                  <Cap size={16} />
-                  <span>
-                    {t(
-                      "ტრენინგების სანახავად შექმენი ანგარიში",
-                      "Create an account to browse trainings"
-                    )}
-                  </span>
-                </button>
-              )}
-
-              {user && hits.trainings.length > 0 && (
+              {hits.trainings.length > 0 && (
                 <div className="global-search-section">
                   <div className="global-search-label">
                     <Cap size={13} /> {t("ტრენინგები", "Trainings")}
@@ -280,7 +249,7 @@ export default function GlobalSearch() {
                 </div>
               )}
 
-              {loaded && totalHits === 0 && (user || hits.centers.length === 0) && (
+              {loaded && totalHits === 0 && (
                 <div className="global-search-empty">
                   {t("ვერაფერი მოიძებნა", "Nothing found")}
                 </div>

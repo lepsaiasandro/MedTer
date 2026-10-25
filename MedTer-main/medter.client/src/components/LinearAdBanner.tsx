@@ -110,7 +110,7 @@ const PLACEMENT_EXTRAS: Record<"trainings" | "centers", PartnerCreative[]> = {
   centers: [
     {
       id: "medter-centers",
-      href: "/centers",
+      href: "/announcements",
       brand: "MedTer",
       titleKa: "ტრენინგ ცენტრები MedTer-ზე",
       titleEn: "Training centers on MedTer",
@@ -203,10 +203,12 @@ export default function LinearAdBanner({
   embedded = false,
   random = false,
   placement = "default",
+  compact = false,
 }: {
   embedded?: boolean;
   random?: boolean;
   placement?: BannerPlacement;
+  compact?: boolean;
 }) {
   const { t } = usePrefs();
   const { pathname } = useLocation();
@@ -248,7 +250,7 @@ export default function LinearAdBanner({
   const logo = partnerLogoUrl(item.brand);
 
   return (
-    <aside className={`partner-strip${embedded ? " partner-strip--embedded" : ""}`} aria-label={t("სპონსორირებული", "Sponsored")}>
+    <aside className={`partner-strip${embedded ? " partner-strip--embedded" : ""}${compact ? " partner-strip--compact" : ""}`} aria-label={t("სპონსორირებული", "Sponsored")}>
       <div className="partner-strip-inner">
         <span className="partner-strip-label">{t("სპონსორირებული", "Sponsored")}</span>
         <a

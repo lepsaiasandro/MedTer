@@ -1,16 +1,16 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
 import api from "../api";
-import { Bell, Chat, ChevronDown, Home, Cap, Sun, Moon, Users, Menu, X } from "./icons";
+import { Bell, Chat, ChevronDown, Home, Cap, Sun, Moon, Menu, X } from "./icons";
 import LinearAdBanner from "./LinearAdBanner";
 import GlobalSearch from "./GlobalSearch";
 import logoIcon from "../assets/medter-icon.png";
 
 interface Notif { id: number; text: string; isRead: boolean; createdAt: string; }
 
-export default function Layout({ children }: { children: ReactNode }) {
+export default function Layout() {
   const { user, login, logout } = useAuth();
   const { t, lang, setLang, theme, toggleTheme } = usePrefs();
   const location = useLocation();
@@ -25,25 +25,17 @@ export default function Layout({ children }: { children: ReactNode }) {
   type NavItem = { to: string; label: string; full?: string };
   const nav: NavItem[] = isGuest
     ? [
-        { to: "/", label: t("მთავარი", "Home") },
-        { to: "/announcements", label: t("ტრენინგები", "Trainings") },
-        { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
-        { to: "/#audience", label: t("ვისთვისაა", "Audience"), full: t("ვისთვისაა", "Who it's for") },
-        { to: "/#contact", label: t("კონტაქტი", "Contact") },
+        { to: "/announcements", label: t("მთავარი", "Home") },
+        { to: "/about", label: t("ჩვენს შესახებ", "About") },
       ]
     : isAdmin
       ? [
           { to: "/", label: t("ადმინი", "Admin"), full: t("ადმინ პანელი", "Admin Panel") },
-          { to: "/announcements", label: t("ტრენინგები", "Trainings") },
-          { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
+          { to: "/announcements", label: t("მთავარი", "Home") },
           { to: "/profile", label: t("პროფილი", "Profile") },
         ]
       : [
-          { to: "/announcements", label: t("ტრენინგები", "Trainings") },
-          { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
-          ...(isCenter ? [
-            { to: "/dashboard", label: t("დაფა", "Dashboard") },
-          ] : []),
+          { to: "/announcements", label: t("მთავარი", "Home") },
           { to: "/profile", label: t("პროფილი", "Profile") },
         ];
 
@@ -172,31 +164,21 @@ export default function Layout({ children }: { children: ReactNode }) {
       )}`
     : "#";
 
-  const homeTo = isGuest || isAdmin ? "/" : "/announcements";
-  const shell: "centers" | "chat" | "feed" | null =
-    location.pathname === "/centers" || location.pathname.startsWith("/centers/")
-      ? "centers"
-      : location.pathname === "/chat"
-        ? "chat"
-        : location.pathname === "/announcements"
-          ? "feed"
-          : null;
+  const homeTo = isAdmin ? "/" : "/announcements";
+  const shell = null;
   const navItems = nav;
   const footerLinks = isGuest
     ? [
-        { to: "/", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
-        { to: "/announcements", label: t("ტრენინგები", "Trainings"), icon: <Cap size={16} /> },
-        { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
+        { to: "/announcements", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
+        { to: "/about", label: t("ჩვენს შესახებ", "About"), icon: <Cap size={16} /> },
       ]
     : isAdmin
       ? [
           { to: "/", label: t("ადმინი", "Admin"), icon: <Home size={16} /> },
-          { to: "/announcements", label: t("ტრენინგები", "Trainings"), icon: <Cap size={16} /> },
-          { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
+          { to: "/announcements", label: t("მთავარი", "Home"), icon: <Cap size={16} /> },
         ]
       : [
-          { to: "/announcements", label: t("ტრენინგები", "Trainings"), icon: <Cap size={16} /> },
-          { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), icon: <Users size={16} /> },
+          { to: "/announcements", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
           { to: "/chat", label: t("შეტყობინებები", "Messages"), icon: <Chat size={16} /> },
         ];
   return (
@@ -315,11 +297,6 @@ export default function Layout({ children }: { children: ReactNode }) {
                       <Link to="/profile" className="dd-item" onClick={() => setMenuOpen(false)}>
                         {t("პროფილი", "Profile")}
                       </Link>
-                      {isCenter && (
-                        <Link to="/dashboard" className="dd-item" onClick={() => setMenuOpen(false)}>
-                          {t("დაფა", "Dashboard")}
-                        </Link>
-                      )}
                       <button className="dd-item" onClick={doLogout}>{t("გასვლა", "Log out")}</button>
                     </div>
                   </>
@@ -472,7 +449,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 
       <LinearAdBanner />
 
-      <main className="page">{children}</main>
+      <main className="page"><Outlet /></main>
 
       {blockedModal && (
         <div className="modal" onClick={() => setBlockedModal(null)}>

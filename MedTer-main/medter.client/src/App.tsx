@@ -3,32 +3,19 @@ import { useAuth } from "./auth";
 import AmbientBackground from "./components/AmbientBackground";
 import Layout from "./components/Layout";
 import Register from "./pages/Register";
-import Home from "./pages/Home";
-import Dashboard from "./pages/Dashboard";
+import About from "./pages/About";
 import Chat from "./pages/Chat";
 import Announcements from "./pages/Announcements";
-import MyAnnouncements from "./pages/MyAnnouncements";
 import CenterDetail from "./pages/CenterDetail";
 import AdminDashboard from "./pages/AdminDashboard";
 import Profile from "./pages/Profile";
 import Pricing from "./pages/Pricing";
 import { type ReactNode } from "react";
 
-function Shell({ children }: { children: ReactNode }) {
-  return <Layout>{children}</Layout>;
-}
-
 function Protected({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/" replace />;
   return <>{children}</>;
-}
-
-function RoleDashboard() {
-  const { user } = useAuth();
-  if (user?.role === "TrainingCenter") return <MyAnnouncements />;
-  if (user?.role === "Admin") return <Navigate to="/" replace />;
-  return <Navigate to="/profile" replace />;
 }
 
 export default function App() {
@@ -41,28 +28,25 @@ export default function App() {
       <Routes>
         <Route path="/register" element={user ? <Navigate to={isAdmin ? "/" : "/announcements"} replace /> : <Register />} />
 
-        {/* Public landing; logged-in users land on the feed */}
-        <Route
-          path="/"
-          element={
-            <Shell>
-              {isAdmin ? <AdminDashboard /> : user ? <Navigate to="/announcements" replace /> : <Home />}
-            </Shell>
-          }
-        />
-        <Route path="/centers" element={<Shell><Dashboard /></Shell>} />
-
-        {/* Auth required */}
-        <Route path="/centers/:userId" element={<Shell><Protected><CenterDetail /></Protected></Shell>} />
-        <Route path="/chat" element={<Shell><Protected><Chat /></Protected></Shell>} />
-        <Route path="/announcements" element={<Shell><Announcements /></Shell>} />
-        <Route path="/dashboard" element={<Shell><Protected><RoleDashboard /></Protected></Shell>} />
-        <Route path="/my-announcements" element={<Shell><Protected><Navigate to="/dashboard" replace /></Protected></Shell>} />
-        <Route path="/certificates" element={<Shell><Protected><Navigate to="/profile" replace /></Protected></Shell>} />
-        <Route path="/profile" element={<Shell><Protected><Profile /></Protected></Shell>} />
-        <Route path="/pricing" element={<Shell><Pricing /></Shell>} />
-        <Route path="/admin" element={<Shell><Protected><AdminDashboard /></Protected></Shell>} />
-        <Route path="*" element={<Navigate to={user && !isAdmin ? "/announcements" : "/"} replace />} />
+        {/* Header stays mounted; only the page outlet changes. */}
+        <Route element={<Layout />}>
+          <Route
+            path="/"
+            element={isAdmin ? <AdminDashboard /> : <Navigate to="/announcements" replace />}
+          />
+          <Route path="/about" element={<About />} />
+          <Route path="/centers" element={<Navigate to="/announcements" replace />} />
+          <Route path="/centers/:userId" element={<CenterDetail />} />
+          <Route path="/chat" element={<Protected><Chat /></Protected>} />
+          <Route path="/announcements" element={<Announcements />} />
+          <Route path="/dashboard" element={<Navigate to="/announcements" replace />} />
+          <Route path="/my-announcements" element={<Navigate to="/announcements" replace />} />
+          <Route path="/certificates" element={<Protected><Navigate to="/profile#certificates" replace /></Protected>} />
+          <Route path="/profile" element={<Protected><Profile /></Protected>} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/admin" element={<Protected><AdminDashboard /></Protected>} />
+          <Route path="*" element={<Navigate to={user && !isAdmin ? "/announcements" : "/"} replace />} />
+        </Route>
       </Routes>
     </>
   );

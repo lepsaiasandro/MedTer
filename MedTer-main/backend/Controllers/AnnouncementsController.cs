@@ -28,11 +28,12 @@ public class AnnouncementsController : ControllerBase
     private bool IsAdmin => User.FindFirstValue(ClaimTypes.Role) == UserRole.Admin.ToString();
     private string MyName => User.FindFirstValue(ClaimTypes.Name) ?? "";
 
-    // All announcements (browse) — only published ones are public
+    // All announcements (browse) — published list is public; actions stay signed-in only
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAll()
     {
-        var myId = MyId;
+        var myId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var list = await _db.Announcements
             .Where(a => a.Status == "Published")
             .OrderByDescending(a => a.CreatedAt)

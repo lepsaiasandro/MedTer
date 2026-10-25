@@ -29,6 +29,8 @@ export default function CenterDetail() {
   const { user } = useAuth();
   const { t, lang } = usePrefs();
   const isDoctor = user?.role === "Doctor";
+  const isGuest = !user;
+  const askLogin = () => window.dispatchEvent(new Event("medter:open-login"));
   const fmtDate = (iso?: string) => { if (!iso) return ""; const d = new Date(iso); return isNaN(d.getTime()) ? "" : `${d.getDate()} ${(lang === "en" ? MONTHS_EN : MONTHS_KA)[d.getMonth()]}, ${d.getFullYear()}`; };
   const [center, setCenter] = useState<TrainingCenter | null>(null);
   const [items, setItems] = useState<Announcement[]>([]);
@@ -122,10 +124,10 @@ export default function CenterDetail() {
             <div style={{ fontSize: 12, color: "var(--soft)", fontWeight: 600, marginBottom: 4 }}>{t("საშუალო შეფასება", "Average rating")}</div>
             <StarsView value={center.averageRating} count={center.ratingCount} size={18} />
           </div>
-          {isDoctor && (
+          {(isDoctor || isGuest) && (
             <div style={{ marginLeft: "auto", flex: "1 1 160px" }}>
               <div style={{ fontSize: 12, color: "var(--soft)", fontWeight: 600, marginBottom: 4 }}>{center.myRating ? t("შენი შეფასება", "Your rating") : t("შეაფასე ეს ცენტრი", "Rate this center")}</div>
-              <StarsInput value={center.myRating ?? 0} onRate={rate} />
+              <StarsInput value={center.myRating ?? 0} onRate={(stars) => { if (isGuest) { askLogin(); return; } void rate(stars); }} />
             </div>
           )}
         </div>
@@ -145,13 +147,13 @@ export default function CenterDetail() {
               <div className="card-banner-bg" aria-hidden="true">
                 <img src={pickCardBanner(a.id, a.imageUrl)} alt="" loading="lazy" />
               </div>
-              {isDoctor && (
+              {(isDoctor || isGuest) && (
                 <button
                   type="button"
                   className="act card-banner-fav"
                   title={t("რჩეულებში დამატება", "Add to favorites")}
                   style={{ color: a.isFavorite ? "var(--brand)" : "var(--muted)" }}
-                  onClick={() => toggleFav(a)}
+                  onClick={() => { if (isGuest) { askLogin(); return; } void toggleFav(a); }}
                 >
                   <Bookmark size={16} filled={a.isFavorite} />
                 </button>
@@ -188,10 +190,10 @@ export default function CenterDetail() {
                   <span style={{ fontSize: 12.5, color: "rgba(255,255,255,.85)" }}>{a.interestedCount} {t("დაინტერესდა", "interested")}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <ShareMenu title={a.title} />
-                    {isDoctor && (
+                    {(isDoctor || isGuest) && (
                       a.isInterested
-                        ? <button className="pill-interest on" onClick={() => toggleInterest(a)}><Check size={14} /> {t("დარეგისტრირებული", "Registered")}</button>
-                        : <button className="btn btn-primary btn-sm" onClick={() => toggleInterest(a)}>{t("რეგისტრაცია", "Register")}</button>
+                        ? <button className="pill-interest on" onClick={() => { if (isGuest) { askLogin(); return; } void toggleInterest(a); }}><Check size={14} /> {t("დარეგისტრირებული", "Registered")}</button>
+                        : <button className="btn btn-primary btn-sm" onClick={() => { if (isGuest) { askLogin(); return; } void toggleInterest(a); }}>{t("რეგისტრაცია", "Register")}</button>
                     )}
                   </div>
                 </div>

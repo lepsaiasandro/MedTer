@@ -151,7 +151,7 @@ export default function Register() {
           profilePhotoUrl: data.profilePhotoUrl ?? data.ProfilePhotoUrl,
         });
         navigate(
-          nextRole === "TrainingCenter" ? "/dashboard?welcome=1" : "/announcements?welcome=1",
+          "/announcements?welcome=1",
           { replace: true }
         );
         return;
@@ -203,15 +203,25 @@ export default function Register() {
     </aside>
   );
 
+  const leave = () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx;
+    if (typeof idx === "number" && idx > 0) navigate(-1);
+    else navigate("/");
+  };
+
   if (done) {
     return (
-      <>
-        <LinearAdBanner />
-        <div className="auth-shell">
-          <AuthPrefs />
-          {brandPanel}
-          <div className="auth-wrap auth-wrap--panel">
-            <div className="auth-card" style={{ maxWidth: 480, textAlign: "center" }}>
+      <div className="auth-shell">
+        <button type="button" className="auth-page-back" onClick={leave}>
+          <ArrowLeft size={16} />
+          {t("უკან", "Back")}
+        </button>
+        <AuthPrefs />
+        {brandPanel}
+        <div className="auth-wrap auth-wrap--panel">
+          <div className="auth-panel-col">
+            <LinearAdBanner compact />
+            <div className="auth-card" style={{ textAlign: "center" }}>
               <div className="auth-logo auth-logo--mobile">
                 <img src={logoIcon} alt="" className="logo-mark-img" />
                 <span className="logo-name">Med<span>Ter</span></span>
@@ -249,18 +259,22 @@ export default function Register() {
             </div>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <LinearAdBanner />
-      <div className="auth-shell">
-        <AuthPrefs />
-        {brandPanel}
-        <div className="auth-wrap auth-wrap--panel">
-          <div className="auth-card" style={{ maxWidth: 480 }}>
+    <div className="auth-shell">
+      <button type="button" className="auth-page-back" onClick={leave}>
+        <ArrowLeft size={16} />
+        {t("უკან", "Back")}
+      </button>
+      <AuthPrefs />
+      {brandPanel}
+      <div className="auth-wrap auth-wrap--panel">
+        <div className="auth-panel-col">
+          <LinearAdBanner compact />
+          <div className="auth-card">
             <div className="auth-logo auth-logo--mobile">
               <img src={logoIcon} alt="" className="logo-mark-img" />
               <span className="logo-name">Med<span>Ter</span></span>
@@ -405,6 +419,6 @@ export default function Register() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
