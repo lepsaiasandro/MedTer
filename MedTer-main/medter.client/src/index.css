@@ -2620,7 +2620,7 @@
   .auth-panel-col > .auth-card { width: 100%; }
   .auth-brand-panel {
     display: flex; flex-direction: column; justify-content: flex-start;
-    padding: 84px clamp(28px, 5vw, 56px) clamp(20px, 3vw, 28px);
+    padding: 112px clamp(28px, 5vw, 56px) clamp(20px, 3vw, 28px);
     background: linear-gradient(160deg, var(--brand) 0%, var(--brand-700) 50%, var(--navy) 120%);
     color: #fff; position: relative; overflow: hidden; min-height: 100%;
   }
@@ -3446,13 +3446,13 @@
 .social-like-count { display: inline-flex; align-items: center; gap: 4px; }
 .social-like-count svg { color: #1877f2; }
 .social-actions { display: flex; border-top: 1px solid var(--border); padding-top: 6px; }
-.social-actions button.liked { color: #1877f2; }
 .social-actions button, .social-actions .share-btn {
   flex: 1; border: none; background: none; color: var(--text-body);
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   font-weight: 700; font-size: 13px; padding: 8px 4px; border-radius: 10px;
 }
 .social-actions button:hover { background: var(--surface-2); }
+.social-actions button.liked { color: #1877f2; }
 .social-rail { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 84px; }
 .social-rail section { padding: 14px; }
 .social-rail header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }

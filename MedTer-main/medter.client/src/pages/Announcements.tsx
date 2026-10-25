@@ -39,8 +39,8 @@ interface Announcement {
   isFavorite: boolean;
   hasGroupChat?: boolean;
   createdAt?: string;
-  likeCount: number;
-  isLiked: boolean;
+  likeCount?: number;
+  isLiked?: boolean;
 }
 
 interface InterestResponse {
@@ -560,6 +560,19 @@ function AnnouncementsFeed() {
                 allLabel={t("ქალაქი", "City")}
                 options={cities.map((c) => ({ value: c, label: c }))}
                 aria-label={t("ქალაქი", "City")}
+              />
+              <FilterSelect
+                value={when}
+                onChange={(v) => setWhenQ(v as WhenFilter)}
+                defaultValue="all"
+                options={[
+                  { value: "all", label: t("ყველა", "All") },
+                  { value: "upcoming", label: t("მომავალი", "Upcoming") },
+                  { value: "week", label: t("ამ კვირაში", "This week") },
+                  { value: "month", label: t("ამ თვეში", "This month") },
+                  { value: "past", label: t("გასული", "Past") },
+                ]}
+                aria-label={t("პერიოდი", "Period")}
               />
               <FilterSelect
                 value={sort}

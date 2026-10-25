@@ -299,6 +299,34 @@ namespace backend.Migrations
                     b.ToTable("Announcements");
                 });
 
+            modelBuilder.Entity("backend.Models.AnnouncementLike", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AnnouncementId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("AnnouncementId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("AnnouncementLikes");
+                });
+
             modelBuilder.Entity("backend.Models.AppSettings", b =>
                 {
                     b.Property<int>("Id")
@@ -950,6 +978,25 @@ namespace backend.Migrations
                     b.Navigation("Center");
                 });
 
+            modelBuilder.Entity("backend.Models.AnnouncementLike", b =>
+                {
+                    b.HasOne("backend.Models.Announcement", "Announcement")
+                        .WithMany("Likes")
+                        .HasForeignKey("AnnouncementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("backend.Models.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Announcement");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("backend.Models.Certificate", b =>
                 {
                     b.HasOne("backend.Models.Announcement", "Announcement")
@@ -1052,8 +1099,6 @@ namespace backend.Migrations
 
                     b.Navigation("Group");
 
-                    b.Navigation("Reactions");
-
                     b.Navigation("Sender");
                 });
 
@@ -1139,6 +1184,8 @@ namespace backend.Migrations
             modelBuilder.Entity("backend.Models.Announcement", b =>
                 {
                     b.Navigation("Interests");
+
+                    b.Navigation("Likes");
                 });
 
             modelBuilder.Entity("backend.Models.ApplicationUser", b =>
@@ -1153,6 +1200,11 @@ namespace backend.Migrations
                     b.Navigation("Members");
 
                     b.Navigation("Messages");
+                });
+
+            modelBuilder.Entity("backend.Models.GroupMessage", b =>
+                {
+                    b.Navigation("Reactions");
                 });
 #pragma warning restore 612, 618
         }

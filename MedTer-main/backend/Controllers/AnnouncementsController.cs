@@ -127,7 +127,9 @@ public class AnnouncementsController : ControllerBase
                 a.CenterUserId, a.Center!.DisplayName,
                 a.Interests.Count, false, false, a.CreatedAt,
                 false,
-                a.MeetingAccess))
+                a.MeetingAccess,
+                a.Likes.Count,
+                false))
             .ToListAsync();
 
         return Ok(list);
