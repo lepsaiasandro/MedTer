@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import { Calendar, Pin, Search, Check, Bookmark, Cap, Chat, X, ExternalLink, Image, Home, Users } from "../components/icons";
+import { Calendar, Pin, Search, Check, Bookmark, Cap, Chat, X, ExternalLink, Home, Users } from "../components/icons";
 import ShareMenu from "../components/ShareMenu";
 import EmptyState from "../components/EmptyState";
 import AuthRequired from "../components/AuthRequired";
@@ -126,8 +126,6 @@ function AnnouncementsFeed() {
   const [modalId, setModalId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [flash, setFlash] = useState<Flash | null>(null);
-  const [draft, setDraft] = useState("");
-  const [notes, setNotes] = useState<{ id: number; text: string }[]>([]);
 
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [category, setCategory] = useState(() => searchParams.get("cat") ?? "");
@@ -375,7 +373,6 @@ function AnnouncementsFeed() {
 
   const registeredCount = mineItems.length;
   const savedCount = items.filter((a) => a.isFavorite).length;
-  const firstName = user?.displayName?.split(" ")[0] ?? "";
   const upcomingMine = mineItems.filter((a) => !a.startDate || new Date(a.startDate).getTime() >= Date.now()).slice(0, 3);
   const savedPreview = items.filter((a) => a.isFavorite).slice(0, 3);
   const source = mineTab ? mineItems : items;
@@ -452,14 +449,6 @@ function AnnouncementsFeed() {
 
   let feedIndex = 0;
 
-  const postNote = (e: React.FormEvent) => {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text) return;
-    setNotes((prev) => [{ id: Date.now(), text }, ...prev]);
-    setDraft("");
-  };
-
   return (
     <div className="social-feed">
       <aside className="social-nav">
@@ -506,40 +495,21 @@ function AnnouncementsFeed() {
         )}
 
         {isCenter && (
-        <form className="social-compose" onSubmit={postNote}>
-          <span className="dir-av social-me">{(user?.displayName || "?").charAt(0)}</span>
-          <div>
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={t(`რას ფიქრობს, ${firstName}?`, `What's on your mind, ${firstName}?`)}
-              aria-label={t("პოსტი", "Post")}
-            />
-            <div className="social-compose-actions">
-              <button type="button"><Image size={15} /> {t("ფოტო", "Photo")}</button>
-              <button type="button" onClick={() => setDraft((v) => v || t("ტრენინგი: ", "Training: "))}>
-                <Cap size={15} /> {t("ტრენინგი", "Training")}
-              </button>
-              <button type="button" onClick={() => setDraft((v) => v.endsWith("?") ? v : `${v}?`)}>
-                <Chat size={15} /> {t("კითხვა", "Question")}
+          <div className="social-compose" style={{ alignItems: "center" }}>
+            <span className="dir-av social-me">{(user?.displayName || "?").charAt(0)}</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div>
+                <strong style={{ color: "#fff", display: "block", marginBottom: 2 }}>{t("ახალი ტრენინგი", "New training")}</strong>
+                <span style={{ color: "#8ea0ba", fontSize: 13, lineHeight: 1.4 }}>
+                  {t("მიუთითე თარიღი, ქულა და ადგილი. ექიმები ფიდზე დაინახავენ.", "Add the date, points and place. Doctors will see it on the feed.")}
+                </span>
+              </div>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate("/dashboard?new=1")}>
+                <Cap size={15} /> {t("ტრენინგის დამატება", "Add training")}
               </button>
             </div>
           </div>
-        </form>
         )}
-
-        {isCenter && notes.map((note) => (
-          <article key={note.id} className="social-post">
-            <header>
-              <span className="dir-av social-me">{(user?.displayName || "?").charAt(0)}</span>
-              <div>
-                <b>{user?.displayName}</b>
-                <span>{t("ახლა · საჯარო", "Just now · Public")}</span>
-              </div>
-            </header>
-            <p>{note.text}</p>
-          </article>
-        ))}
 
         <FilterBar
           collapsible

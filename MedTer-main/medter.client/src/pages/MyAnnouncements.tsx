@@ -64,7 +64,7 @@ interface FormState {
 }
 
 const emptyForm: FormState = {
-  type: "კონფერენცია",
+  type: "ტრენინგი",
   title: "",
   category: "",
   format: "ონლაინ",
@@ -110,8 +110,35 @@ function formatDate(iso: string | undefined, lang: string) {
   if (!iso) return "";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
-  return `${d.getDate()} ${(lang === "en" ? MONTHS_EN : MONTHS_KA)[d.getMonth()]}, ${d.getFullYear()}`;
+  const date = `${d.getDate()} ${(lang === "en" ? MONTHS_EN : MONTHS_KA)[d.getMonth()]}, ${d.getFullYear()}`;
+  if (!iso.includes("T")) return date;
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${date}, ${hh}:${mm}`;
 }
+
+function toLocalInput(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fromLocalInput(value: string) {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function dateOnlyToIso(value: string) {
+  if (!value) return null;
+  const [y, m, d] = value.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, 12, 0, 0).toISOString();
+}
+
+type FieldKey = "title" | "category" | "startDate" | "points" | "city" | "meetingAccess" | "image";
 
 /* ── reusable icons ─────────────────────────────────────────────────── */
 const IcCalendar = (
@@ -164,6 +191,8 @@ export default function MyAnnouncements() {
   const [certDone, setCertDone] = useState<string | null>(null);  // recently succeeded (green flash)
 
   const [subActive, setSubActive] = useState<boolean | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
+  const [saving, setSaving] = useState<"Published" | "Draft" | null>(null);
 
   const load = () => api.get<Announcement[]>("/announcements/mine").then((r) => setItems(r.data));
   const loadBilling = () =>
@@ -179,6 +208,17 @@ export default function MyAnnouncements() {
     const next = new URLSearchParams(searchParams);
     next.delete("welcome");
     setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    setForm({ ...emptyForm });
+    setFieldErrors({});
+    setView("form");
+    const next = new URLSearchParams(searchParams);
+    next.delete("new");
+    setSearchParams(next, { replace: true });
+    window.scrollTo(0, 0);
   }, [searchParams, setSearchParams]);
 
   const createGroupChat = async (announcementId: number) => {
@@ -219,17 +259,18 @@ export default function MyAnnouncements() {
   ].filter(Boolean) as FilterChip[];
 
   /* ── form actions ── */
-  const openCreate = () => { setForm(emptyForm); setView("form"); window.scrollTo(0, 0); };
+  const openCreate = () => { setForm(emptyForm); setFieldErrors({}); setView("form"); window.scrollTo(0, 0); };
   const openEdit = (a: Announcement) => {
+    setFieldErrors({});
     setForm({
       id: a.id,
-      type: a.type || "კონფერენცია",
+      type: a.type || "ტრენინგი",
       title: a.title,
       category: a.category || "",
       format: a.format || "ონლაინ",
       shortDescription: a.shortDescription || "",
       description: a.description || "",
-      startDate: a.startDate ? a.startDate.slice(0, 10) : "",
+      startDate: toLocalInput(a.startDate),
       duration: a.duration || "",
       city: a.city || "",
       meetingAccess: a.meetingAccess || "",
@@ -244,8 +285,34 @@ export default function MyAnnouncements() {
     window.scrollTo(0, 0);
   };
 
+  const patchForm = (patch: Partial<FormState>, clear?: FieldKey) => {
+    setForm((f) => ({ ...f, ...patch }));
+    if (clear) setFieldErrors((e) => ({ ...e, [clear]: undefined }));
+  };
+
   const submit = async (status: "Published" | "Draft") => {
-    if (!form.title.trim()) { alert(t("გთხოვ შეავსე სათაური", "Please fill in the title")); return; }
+    const next: Partial<Record<FieldKey, string>> = {};
+    if (!form.title.trim()) next.title = t("სათაური სავალდებულოა", "Title is required");
+    if (status === "Published") {
+      if (!form.category) next.category = t("აირჩიე კატეგორია", "Choose a category");
+      if (!form.startDate) next.startDate = t("მიუთითე თარიღი და დრო", "Set the date and time");
+      if (form.points.trim() === "" || Number.isNaN(Number(form.points)) || Number(form.points) < 0) {
+        next.points = t("მიუთითე უპგ ქულა", "Enter CPD points");
+      }
+      if (form.format !== "ონლაინ" && !form.city.trim()) {
+        next.city = t("დასწრებით ტრენინგს ქალაქი სჭირდება", "In-person trainings need a city");
+      }
+      if (form.format !== "დასწრებით") {
+        const link = form.meetingAccess.trim();
+        if (!link) next.meetingAccess = t("ონლაინ ტრენინგს შეხვედრის ლინკი სჭირდება", "Online trainings need a meeting link");
+        else if (!/^https?:\/\//i.test(link)) next.meetingAccess = t("ლინკი https://-ით უნდა იწყებოდეს", "The link must start with https://");
+      }
+    }
+    setFieldErrors(next);
+    if (Object.keys(next).length > 0) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
     const body = {
       title: form.title.trim(),
       type: form.type,
@@ -261,15 +328,17 @@ export default function MyAnnouncements() {
       price: Number(form.price) || 0,
       seats: form.seats ? Number(form.seats) : null,
       imageUrl: form.imageUrl || null,
-      startDate: form.startDate ? new Date(form.startDate).toISOString() : null,
-      registrationDeadline: form.registrationDeadline ? new Date(form.registrationDeadline).toISOString() : null,
+      startDate: fromLocalInput(form.startDate),
+      registrationDeadline: dateOnlyToIso(form.registrationDeadline),
       status,
     };
+    setSaving(status);
     try {
       if (form.id) await api.put(`/announcements/${form.id}`, body);
       else await api.post("/announcements", body);
       setView("list");
       setForm(emptyForm);
+      setFieldErrors({});
       load();
     } catch (e: unknown) {
       const data = (e as { response?: { status?: number; data?: { message?: string; code?: string } } })?.response;
@@ -283,6 +352,8 @@ export default function MyAnnouncements() {
         return;
       }
       alert(data?.data?.message || t("შენახვა ვერ მოხერხდა", "Save failed"));
+    } finally {
+      setSaving(null);
     }
   };
 
@@ -294,8 +365,19 @@ export default function MyAnnouncements() {
 
   const onPickBanner = (file?: File) => {
     if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setFieldErrors((e) => ({ ...e, image: t("მხოლოდ სურათია დაშვებული", "Only images are allowed") }));
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setFieldErrors((e) => ({ ...e, image: t("სურათი არ უნდა აღემატებოდეს 5MB-ს", "Image must be under 5MB") }));
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = () => setForm((f) => ({ ...f, imageUrl: String(reader.result) }));
+    reader.onload = () => {
+      setForm((f) => ({ ...f, imageUrl: String(reader.result) }));
+      setFieldErrors((e) => ({ ...e, image: undefined }));
+    };
     reader.readAsDataURL(file);
   };
 
@@ -352,6 +434,11 @@ export default function MyAnnouncements() {
         </div>
 
         <div className="form-layout">
+          {Object.values(fieldErrors).some(Boolean) && (
+            <div className="auth-error" style={{ gridColumn: "1 / -1" }}>
+              {t("გამოქვეყნებამდე შეავსე მონიშნული ველები", "Fill in the marked fields before publishing")}
+            </div>
+          )}
           {/* LEFT: form */}
           <div>
             {/* section 1 */}
@@ -378,23 +465,34 @@ export default function MyAnnouncements() {
               <div className="field">
                 <label>{t("სათაური", "Title")} <span className="req">*</span></label>
                 <input className="control" placeholder={t("მაგ: Cardio Update 2026 — გულის უკმარისობის მართვა", "e.g. Cardio Update 2026 — heart failure management")}
-                  value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                  value={form.title} onChange={(e) => patchForm({ title: e.target.value }, "title")}
+                  style={fieldErrors.title ? { borderColor: "var(--danger)" } : undefined} />
+                {fieldErrors.title && <div className="hint" style={{ color: "var(--danger)" }}>{fieldErrors.title}</div>}
               </div>
 
               <div className="field-grid">
                 <div className="field" style={{ marginBottom: 0 }}>
                   <label>{t("კატეგორია / სპეციალობა", "Category / specialty")} <span className="req">*</span></label>
-                  <select className="control" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                  <select className="control" value={form.category} onChange={(e) => patchForm({ category: e.target.value }, "category")}
+                    style={fieldErrors.category ? { borderColor: "var(--danger)" } : undefined}>
                     <option value="">{t("აირჩიე კატეგორია…", "Choose a category…")}</option>
                     {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
                   </select>
+                  {fieldErrors.category && <div className="hint" style={{ color: "var(--danger)" }}>{fieldErrors.category}</div>}
                 </div>
                 <div className="field" style={{ marginBottom: 0 }}>
                   <label>{t("ფორმატი", "Format")} <span className="req">*</span></label>
                   <div className="radio-row">
-                    {["ონლაინ", "დასწრებით"].map((f) => (
-                      <label key={f} className={`radio-opt ${form.format === f ? "sel" : ""}`} onClick={() => setForm({ ...form, format: f })}>
-                        <span className="radio-dot" /><span>{f === "ონლაინ" ? t("ონლაინ", "Online") : t("დასწრებით", "In person")}</span>
+                    {(["ონლაინ", "დასწრებით", "ჰიბრიდული"] as const).map((f) => (
+                      <label key={f} className={`radio-opt ${form.format === f ? "sel" : ""}`} onClick={() => {
+                        setForm((prev) => ({ ...prev, format: f }));
+                        setFieldErrors((e) => ({
+                          ...e,
+                          city: f === "ონლაინ" ? undefined : e.city,
+                          meetingAccess: f === "დასწრებით" ? undefined : e.meetingAccess,
+                        }));
+                      }}>
+                        <span className="radio-dot" /><span>{f === "ონლაინ" ? t("ონლაინ", "Online") : f === "დასწრებით" ? t("დასწრებით", "In person") : t("ჰიბრიდი", "Hybrid")}</span>
                       </label>
                     ))}
                   </div>
@@ -423,8 +521,10 @@ export default function MyAnnouncements() {
 
               <div className="field-grid">
                 <div className="field">
-                  <label>{t("თარიღი", "Date")} <span className="req">*</span></label>
-                  <input className="control" type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+                  <label>{t("თარიღი და დრო", "Date and time")} <span className="req">*</span></label>
+                  <input className="control" type="datetime-local" value={form.startDate} onChange={(e) => patchForm({ startDate: e.target.value }, "startDate")}
+                    style={fieldErrors.startDate ? { borderColor: "var(--danger)" } : undefined} />
+                  {fieldErrors.startDate && <div className="hint" style={{ color: "var(--danger)" }}>{fieldErrors.startDate}</div>}
                 </div>
                 <div className="field">
                   <label>{t("ხანგრძლივობა", "Duration")}</label>
@@ -435,8 +535,11 @@ export default function MyAnnouncements() {
                 <div className="field" style={{ marginBottom: 0 }}>
                   <label>{t("ქალაქი", "City")}</label>
                   <input className="control" placeholder={t("მაგ: თბილისი", "e.g. Tbilisi")}
-                    value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-                  <div className="hint">{t("საჯაროდ ჩანს ბარათზე", "Shown publicly on the card")}</div>
+                    value={form.city} onChange={(e) => patchForm({ city: e.target.value }, "city")}
+                    style={fieldErrors.city ? { borderColor: "var(--danger)" } : undefined} />
+                  <div className="hint" style={fieldErrors.city ? { color: "var(--danger)" } : undefined}>
+                    {fieldErrors.city || t("საჯაროდ ჩანს ბარათზე", "Shown publicly on the card")}
+                  </div>
                 </div>
                 <div className="field" style={{ marginBottom: 0 }}>
                   <label>{t("ენა", "Language")}</label>
@@ -449,22 +552,23 @@ export default function MyAnnouncements() {
               </div>
               <div className="field" style={{ marginTop: 14, marginBottom: 0 }}>
                 <label>
-                  {form.format === "ონლაინ"
-                    ? t("შეხვედრის ლინკი", "Meeting link")
-                    : t("ზუსტი მისამართი / ლოკაცია", "Exact address / location")}
+                  {form.format === "დასწრებით"
+                    ? t("ზუსტი მისამართი / ლოკაცია", "Exact address / location")
+                    : t("შეხვედრის ლინკი", "Meeting link")}
                 </label>
                 <input
                   className="control"
                   placeholder={
-                    form.format === "ონლაინ"
-                      ? t("მაგ: https://zoom.us/j/… ან Google Meet ლინკი", "e.g. https://zoom.us/j/… or Google Meet link")
-                      : t("მაგ: თბილისი, რადისონ ბლუ, მე-2 სართული", "e.g. Tbilisi, Radisson Blu, 2nd floor")
+                    form.format === "დასწრებით"
+                      ? t("მაგ: თბილისი, რადისონ ბლუ, მე-2 სართული", "e.g. Tbilisi, Radisson Blu, 2nd floor")
+                      : t("მაგ: https://zoom.us/j/… ან Google Meet ლინკი", "e.g. https://zoom.us/j/… or Google Meet link")
                   }
                   value={form.meetingAccess}
-                  onChange={(e) => setForm({ ...form, meetingAccess: e.target.value })}
+                  onChange={(e) => patchForm({ meetingAccess: e.target.value }, "meetingAccess")}
+                  style={fieldErrors.meetingAccess ? { borderColor: "var(--danger)" } : undefined}
                 />
-                <div className="hint">
-                  {t(
+                <div className="hint" style={fieldErrors.meetingAccess ? { color: "var(--danger)" } : undefined}>
+                  {fieldErrors.meetingAccess || t(
                     "მხოლოდ დარეგისტრირებულ ექიმებს გამოჩნდება რეგისტრაციის შემდეგ",
                     "Only registered doctors see this after they register"
                   )}
@@ -481,8 +585,11 @@ export default function MyAnnouncements() {
               <div className="field-grid">
                 <div className="field">
                   <label>{t("უპგ ქულა", "CPD points")} <span className="req">*</span></label>
-                  <input className="control" type="number" min={0} placeholder={t("მაგ: 20", "e.g. 20")} value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} />
-                  <div className="hint">{t("უწყვეტი სამედიცინო განათლების ქულა", "Continuing medical education points")}</div>
+                  <input className="control" type="number" min={0} placeholder={t("მაგ: 20", "e.g. 20")} value={form.points} onChange={(e) => patchForm({ points: e.target.value }, "points")}
+                    style={fieldErrors.points ? { borderColor: "var(--danger)" } : undefined} />
+                  <div className="hint" style={fieldErrors.points ? { color: "var(--danger)" } : undefined}>
+                    {fieldErrors.points || t("უწყვეტი სამედიცინო განათლების ქულა", "Continuing medical education points")}
+                  </div>
                 </div>
                 <div className="field">
                   <label>{t("ფასი (₾)", "Price (₾)")}</label>
@@ -524,6 +631,7 @@ export default function MyAnnouncements() {
                 )}
                 <input type="file" accept="image/*" hidden onChange={(e) => onPickBanner(e.target.files?.[0] || undefined)} />
               </label>
+              {fieldErrors.image && <div className="hint" style={{ color: "var(--danger)" }}>{fieldErrors.image}</div>}
               {form.imageUrl && (
                 <button className="btn btn-text" style={{ marginTop: 8 }} onClick={() => setForm({ ...form, imageUrl: "" })}>
                   {t("ბანერის წაშლა", "Remove banner")}
@@ -535,9 +643,9 @@ export default function MyAnnouncements() {
             <div className="form-actions">
               <span className="note">{t("გამოქვეყნებამდე განცხადება ადმინისტრატორის დასადასტურებლად გაიგზავნება", "Before publishing, the announcement is sent to an administrator for approval")}</span>
               <div className="spacer" />
-              <button className="btn btn-text" onClick={() => setView("list")}>{t("გაუქმება", "Cancel")}</button>
-              <button className="btn btn-ghost" onClick={() => submit("Draft")}>{t("მონახაზად შენახვა", "Save as draft")}</button>
-              <button className="btn btn-primary" onClick={() => submit("Published")}>{t("დადასტურებაზე გაგზავნა", "Send for approval")}</button>
+              <button className="btn btn-text" onClick={() => setView("list")} disabled={!!saving}>{t("გაუქმება", "Cancel")}</button>
+              <button className="btn btn-ghost" onClick={() => submit("Draft")} disabled={!!saving}>{saving === "Draft" ? t("ინახება…", "Saving…") : t("მონახაზად შენახვა", "Save as draft")}</button>
+              <button className="btn btn-primary" onClick={() => submit("Published")} disabled={!!saving}>{saving === "Published" ? t("იგზავნება…", "Sending…") : t("დადასტურებაზე გაგზავნა", "Send for approval")}</button>
             </div>
           </div>
 
