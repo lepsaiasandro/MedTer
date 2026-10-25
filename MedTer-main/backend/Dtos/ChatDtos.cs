@@ -24,7 +24,12 @@ public record ChatGroupDto(
     DateTime? LastMessageAt,
     string? LastMessagePreview,
     int UnreadCount,
-    bool IsOwner);
+    bool IsOwner,
+    bool LastMessageUnsent = false);
+
+public record ReactionUserDto(string UserId, string DisplayName);
+
+public record MessageReactionDto(string Emoji, int Count, IReadOnlyList<ReactionUserDto> Users);
 
 public record GroupMessageDto(
     int Id,
@@ -32,7 +37,22 @@ public record GroupMessageDto(
     string SenderId,
     string SenderName,
     string Text,
-    DateTime SentAt);
+    DateTime SentAt,
+    bool Unsent,
+    IReadOnlyList<MessageReactionDto> Reactions);
+
+public record GroupMessageUnsentDto(
+    int MessageId,
+    int GroupId,
+    DateTime UnsentAt,
+    string? LastMessagePreview,
+    DateTime? LastMessageAt,
+    bool LastMessageUnsent);
+
+public record MessageReactionsUpdatedDto(
+    int MessageId,
+    int GroupId,
+    IReadOnlyList<MessageReactionDto> Reactions);
 
 public record GroupMemberDto(
     string UserId,

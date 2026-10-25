@@ -249,59 +249,148 @@ public static class DbSeeder
         }
     }
 
+    private sealed record DemoTraining(
+        string CenterEmail,
+        string Title,
+        string Type,
+        string Category,
+        string Format,
+        string Summary,
+        string? City,
+        string Duration,
+        int Points,
+        int Price,
+        int Seats,
+        int DayOffset,
+        string? MeetingAccess);
+
+    private static readonly DemoTraining[] DemoTrainings =
+    [
+        new("promed@medter.ge", "Cardio Update 2026 — გულის უკმარისობის მართვა", "კონფერენცია", "კარდიოლოგია", "დასწრებით",
+            "ინტენსიური კურსი ECG ინტერპრეტაციასა და გადაუდებელ კარდიოლოგიაზე.", "თბილისი", "2 დღე", 20, 0, 50, 14,
+            "თბილისი, ვაჟა-ფშაველას გამზირი 70, საკონფერენციო დარბაზი"),
+        new("promed@medter.ge", "შინაგანი მედიცინის განახლება", "ტრენინგი", "ზოგადი პრაქტიკა", "ონლაინ",
+            "თანამედროვე მიდგომები დიაგნოსტიკასა და მკურნალობაში.", null, "6 საათი", 8, 0, 100, 28,
+            "https://meet.example.com/medter-internal-medicine"),
+        new("medlearn@medter.ge", "Emergency Medicine — რეანიმაციის პრაქტიკული ტრენინგი", "ტრენინგი", "გადაუდებელი მედიცინა", "დასწრებით",
+            "პრაქტიკული ტრენინგი BLS/ACLS პროტოკოლებზე.", "ბათუმი", "1 დღე", 16, 0, 40, 45,
+            "ბათუმი, მემედ აბაშიძის გამზირი 12, სიმულაციური ცენტრი"),
+        new("promed@medter.ge", "ECG ინტერპრეტაცია პრაქტიკაში", "ტრენინგი", "კარდიოლოგია", "დასწრებით",
+            "რიტმის დარღვევები, იშემია და კლინიკური შემთხვევების გარჩევა.", "თბილისი", "6 საათი", 12, 40, 24, 6,
+            "თბილისი, კოსტავას 45, სასწავლო ოთახი 2"),
+        new("promed@medter.ge", "არტერიული ჰიპერტენზიის გაიდლაინები", "სემინარი", "კარდიოლოგია", "ონლაინ",
+            "2026 წლის რეკომენდაციები და პირველადი რგოლის ალგორითმები.", null, "3 საათი", 6, 0, 80, 9,
+            "https://meet.example.com/medter-hypertension"),
+        new("promed@medter.ge", "დიაბეტის მართვა პირველად ჯანდაცვაში", "ტრენინგი", "ენდოკრინოლოგია", "დასწრებით",
+            "გლიკემიის მიზნები, ინსულინოთერაპია და გართულებების პრევენცია.", "თბილისი", "1 დღე", 10, 0, 60, 21,
+            "თბილისი, ჭავჭავაძის გამზირი 5"),
+        new("promed@medter.ge", "რაციონალური ანტიბიოტიკოთერაპია", "კონფერენცია", "ინფექციური დაავადებები", "დასწრებით",
+            "რეზისტენტობა, ემპირიული არჩევანი და სტაციონარის პროტოკოლები.", "თბილისი", "1 დღე", 10, 80, 100, 60,
+            "თბილისი, რუსთაველის გამზირი 29"),
+        new("promed@medter.ge", "ონკოლოგიური სიფხიზლე ოჯახის ექიმისთვის", "ტრენინგი", "ონკოლოგია", "ონლაინ",
+            "ადრეული ნიშნები, მარშრუტიზაცია და სკრინინგის ინტერვალები.", null, "4 საათი", 8, 0, 90, 35,
+            "https://meet.example.com/medter-oncology"),
+        new("medlearn@medter.ge", "BLS/ACLS სიმულაციური სესია", "ტრენინგი", "გადაუდებელი მედიცინა", "დასწრებით",
+            "გუნდური რეანიმაცია მანეკენებზე და დეფიბრილაციის პრაქტიკა.", "ბათუმი", "8 საათი", 14, 50, 20, 4,
+            "ბათუმი, ზუბალაშვილის 18, სიმულაციური დარბაზი"),
+        new("medlearn@medter.ge", "ტრავმის პირველადი შეფასება", "ტრენინგი", "გადაუდებელი მედიცინა", "დასწრებით",
+            "ATLS პრინციპები: სასუნთქი გზები, შოკი და მეორადი დათვალიერება.", "ბათუმი", "2 დღე", 18, 120, 28, 18,
+            "ბათუმი, მემედ აბაშიძის გამზირი 12"),
+        new("medlearn@medter.ge", "ულტრაბგერა გადაუდებელ მედიცინაში", "ტრენინგი", "გადაუდებელი მედიცინა", "დასწრებით",
+            "eFAST, ფილტვისა და გულის საწოლთან გამოკვლევა.", "ბათუმი", "1 დღე", 14, 90, 16, 12,
+            "ბათუმი, გორგილაძის 88"),
+        new("medlearn@medter.ge", "შოკისა და სეფსისის საათი", "სემინარი", "გადაუდებელი მედიცინა", "ონლაინ",
+            "ადრეული ამოცნობა, სითხეები და ვაზოპრესორების დაწყება.", null, "3 საათი", 6, 0, 70, 31,
+            "https://meet.example.com/medter-sepsis"),
+        new("vitamed@medter.ge", "პედიატრიული რეანიმაცია PALS", "ტრენინგი", "პედიატრია", "დასწრებით",
+            "ბავშვთა გულ-ფილტვის რეანიმაცია და გუნდური სცენარები.", "ქუთაისი", "1 დღე", 16, 70, 24, 11,
+            "ქუთაისი, ჭავჭავაძის 22, სასწავლო ცენტრი"),
+        new("vitamed@medter.ge", "ვაქცინაციის განახლებული კალენდარი", "სემინარი", "პედიატრია", "ონლაინ",
+            "ეროვნული კალენდარი, უკუჩვენებები და მშობლებთან კომუნიკაცია.", null, "3 საათი", 6, 0, 120, 7,
+            "https://meet.example.com/medter-vaccines"),
+        new("vitamed@medter.ge", "ნეონატალური სიყვითლის მართვა", "ტრენინგი", "ნეონატოლოგია", "დასწრებით",
+            "რისკის შეფასება, ფოტოთერაპია და ჰოსპიტალიზაციის კრიტერიუმები.", "ქუთაისი", "5 საათი", 8, 0, 36, 33,
+            "ქუთაისი, ნიკეას 5"),
+        new("vitamed@medter.ge", "ბავშვთა ასთმა და ალერგია", "კონფერენცია", "პედიატრია", "დასწრებით",
+            "ინჰალაციური თერაპია, გამწვავება და გრძელვადიანი კონტროლი.", "ქუთაისი", "1 დღე", 12, 0, 70, 52,
+            "ქუთაისი, წერეთლის 14"),
+        new("vitamed@medter.ge", "ფსიქიკური ჯანმრთელობა პირველად რგოლში", "სემინარი", "ზოგადი პრაქტიკა", "ონლაინ",
+            "შფოთვა, დეპრესია და როდის გადავამისამართოთ სპეციალისტთან.", null, "4 საათი", 8, 0, 80, 22,
+            "https://meet.example.com/medter-mental-health"),
+        new("neuroedu@medter.ge", "ინსულტის მწვავე მართვა", "ტრენინგი", "ნევროლოგია", "დასწრებით",
+            "დროის ფანჯარა, თრომბოლიზისი და სიმპტომური ზრუნვა.", "თბილისი", "1 დღე", 15, 0, 36, 5,
+            "თბილისი, ვაჟა-ფშაველას გამზირი 27"),
+        new("neuroedu@medter.ge", "ეპილეფსიის დიაგნოსტიკა", "სემინარი", "ნევროლოგია", "ონლაინ",
+            "პირველი გულყრა, EEG ჩვენებები და ანტიკონვულსანტის არჩევა.", null, "4 საათი", 8, 0, 90, 16,
+            "https://meet.example.com/medter-epilepsy"),
+        new("neuroedu@medter.ge", "თავის ტკივილის დიფერენციული დიაგნოზი", "ტრენინგი", "ნევროლოგია", "დასწრებით",
+            "შაკიკი, საშიში ნიშნები და პირველადი დახმარება.", "თბილისი", "6 საათი", 10, 30, 40, 26,
+            "თბილისი, ყაზბეგის 12"),
+        new("neuroedu@medter.ge", "ნეიროვიზუალიზაციის საფუძვლები", "ტრენინგი", "ნევროლოგია", "ონლაინ",
+            "CT და MRI: როდის რომელს ვირჩევთ და როგორ ვკითხულობთ დასკვნას.", null, "5 საათი", 12, 0, 80, 40,
+            "https://meet.example.com/medter-neuroimaging"),
+        new("medlearn@medter.ge", "გულ-ფილტვის რეანიმაციის განახლება", "ტრენინგი", "გადაუდებელი მედიცინა", "დასწრებით",
+            "გასული პრაქტიკული სესია განახლებულ BLS ალგორითმზე.", "ბათუმი", "4 საათი", 8, 0, 30, -12,
+            "ბათუმი, მემედ აბაშიძის გამზირი 12"),
+        new("vitamed@medter.ge", "პედიატრიული გასტროენტეროლოგია", "სემინარი", "პედიატრია", "ონლაინ",
+            "გასული სემინარი დიარეის, რეჰიდრატაციისა და კვების შესახებ.", null, "3 საათი", 6, 0, 60, -20,
+            "https://meet.example.com/medter-gastro"),
+    ];
+
     private static async Task EnsureDemoAnnouncementsAsync(IServiceProvider services)
     {
         var db = services.GetRequiredService<AppDbContext>();
         var users = services.GetRequiredService<UserManager<ApplicationUser>>();
-        var promed = await users.FindByEmailAsync("promed@medter.ge");
-        var medlearn = await users.FindByEmailAsync("medlearn@medter.ge");
         var today = DateTime.UtcNow.Date;
 
-        if (!await db.Announcements.AnyAsync())
+        var centerIds = new Dictionary<string, string>();
+        foreach (var email in DemoTrainings.Select(t => t.CenterEmail).Distinct())
         {
-            if (promed is not null)
-            {
-                db.Announcements.Add(new Announcement
-                {
-                    Title = "Cardio Update 2026 — გულის უკმარისობის მართვა",
-                    Type = "კონფერენცია", Category = "კარდიოლოგია", Format = "დასწრებით",
-                    ShortDescription = "ინტენსიური კურსი ECG ინტერპრეტაციასა და გადაუდებელ კარდიოლოგიაზე.",
-                    Description = "ინტენსიური კურსი ECG ინტერპრეტაციასა და გადაუდებელ კარდიოლოგიაზე.",
-                    City = "თბილისი", Duration = "2 დღე", Language = "ქართული",
-                    Points = 20, Price = 0, Seats = 50, Status = "Published",
-                    CenterUserId = promed.Id, StartDate = today.AddDays(14)
-                });
-                db.Announcements.Add(new Announcement
-                {
-                    Title = "შინაგანი მედიცინის განახლება",
-                    Type = "ტრენინგი", Category = "ზოგადი პრაქტიკა", Format = "ონლაინ",
-                    ShortDescription = "თანამედროვე მიდგომები დიაგნოსტიკასა და მკურნალობაში.",
-                    Description = "თანამედროვე მიდგომები დიაგნოსტიკასა და მკურნალობაში.",
-                    Duration = "6 საათი", Language = "ქართული",
-                    Points = 8, Price = 0, Seats = 100, Status = "Published",
-                    CenterUserId = promed.Id, StartDate = today.AddDays(28)
-                });
-            }
-            if (medlearn is not null)
-            {
-                db.Announcements.Add(new Announcement
-                {
-                    Title = "Emergency Medicine — რეანიმაციის პრაქტიკული ტრენინგი",
-                    Type = "ტრენინგი", Category = "გადაუდებელი მედიცინა", Format = "დასწრებით",
-                    ShortDescription = "პრაქტიკული ტრენინგი BLS/ACLS პროტოკოლებზე.",
-                    Description = "პრაქტიკული ტრენინგი BLS/ACLS პროტოკოლებზე.",
-                    City = "ბათუმი", Duration = "1 დღე", Language = "ქართული",
-                    Points = 16, Price = 0, Seats = 40, Status = "Published",
-                    CenterUserId = medlearn.Id, StartDate = today.AddDays(45)
-                });
-            }
-            await db.SaveChangesAsync();
-            return;
+            var center = await users.FindByEmailAsync(email);
+            if (center is not null) centerIds[email] = center.Id;
         }
+
+        var existingTitles = await db.Announcements
+            .Select(a => a.Title)
+            .ToListAsync();
+        var known = new HashSet<string>(existingTitles);
+
+        foreach (var item in DemoTrainings)
+        {
+            if (known.Contains(item.Title)) continue;
+            if (!centerIds.TryGetValue(item.CenterEmail, out var centerId)) continue;
+
+            var start = today.AddDays(item.DayOffset).AddHours(item.Format == "ონლაინ" ? 18 : 10);
+            db.Announcements.Add(new Announcement
+            {
+                Title = item.Title,
+                Type = item.Type,
+                Category = item.Category,
+                Format = item.Format,
+                ShortDescription = item.Summary,
+                Description = item.Summary,
+                City = item.City,
+                MeetingAccess = item.MeetingAccess,
+                Duration = item.Duration,
+                Language = "ქართული",
+                Points = item.Points,
+                Price = item.Price,
+                Seats = item.Seats,
+                Status = "Published",
+                CenterUserId = centerId,
+                StartDate = start,
+                RegistrationDeadline = start.AddDays(-1),
+                CreatedAt = today.AddDays(Math.Min(item.DayOffset, 0) - 3)
+            });
+            known.Add(item.Title);
+        }
+
+        await db.SaveChangesAsync();
+        await SeedDemoFeedInterestsAsync(db, users);
 
         // Keep demo feed usable: if every published demo training is in the past,
         // roll start dates forward relative to today (idempotent on each boot).
-        var demoCenterIds = new[] { promed?.Id, medlearn?.Id }.Where(id => id != null).Cast<string>().ToList();
+        var demoCenterIds = centerIds.Values.ToList();
         if (demoCenterIds.Count == 0) return;
 
         var demo = await db.Announcements
@@ -311,11 +400,70 @@ public static class DbSeeder
         if (demo.Count == 0) return;
         if (demo.Any(a => a.StartDate == null || a.StartDate.Value.Date >= today)) return;
 
-        var offsets = new[] { 14, 28, 45 };
         for (var i = 0; i < demo.Count; i++)
-            demo[i].StartDate = today.AddDays(offsets[Math.Min(i, offsets.Length - 1)]);
+            demo[i].StartDate = today.AddDays(4 + (i % 12) * 5);
 
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Stable, varied registration counts so the feed does not show every demo training as empty.
+    /// </summary>
+    private static async Task SeedDemoFeedInterestsAsync(AppDbContext db, UserManager<ApplicationUser> users)
+    {
+        var doctors = new List<ApplicationUser>();
+        foreach (var email in new[] { "nino@medter.ge", "giorgi@medter.ge", "mariam@medter.ge" })
+        {
+            var doctor = await users.FindByEmailAsync(email);
+            if (doctor is not null) doctors.Add(doctor);
+        }
+        if (doctors.Count == 0) return;
+
+        var titles = DemoTrainings.Select(t => t.Title).ToList();
+        var announcements = await db.Announcements
+            .Where(a => titles.Contains(a.Title) && a.Status == "Published")
+            .Select(a => new { a.Id, a.Title })
+            .ToListAsync();
+        if (announcements.Count == 0) return;
+
+        var announcementIds = announcements.Select(a => a.Id).ToList();
+        var doctorIds = doctors.Select(d => d.Id).ToList();
+        var existing = await db.Interests
+            .Where(i => announcementIds.Contains(i.AnnouncementId) && doctorIds.Contains(i.DoctorUserId))
+            .Select(i => new { i.AnnouncementId, i.DoctorUserId })
+            .ToListAsync();
+        var have = existing.Select(i => (i.AnnouncementId, i.DoctorUserId)).ToHashSet();
+
+        var added = false;
+        foreach (var announcement in announcements)
+        {
+            var hash = StableHash(announcement.Title);
+            for (var i = 0; i < doctors.Count; i++)
+            {
+                if ((hash + i * 7) % 5 >= 2) continue;
+                var key = (announcement.Id, doctors[i].Id);
+                if (!have.Add(key)) continue;
+                db.Interests.Add(new Interest
+                {
+                    AnnouncementId = announcement.Id,
+                    DoctorUserId = doctors[i].Id
+                });
+                added = true;
+            }
+        }
+
+        if (added) await db.SaveChangesAsync();
+    }
+
+    private static int StableHash(string value)
+    {
+        unchecked
+        {
+            var hash = 17;
+            foreach (var c in value)
+                hash = hash * 31 + c;
+            return hash & int.MaxValue;
+        }
     }
 
     private static async Task ResetPasswordAsync(UserManager<ApplicationUser> users, ApplicationUser user, string password)

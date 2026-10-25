@@ -51,14 +51,14 @@ public class ChatController : ControllerBase
                 g.CreatedByUserId,
                 LastMessage = g.Messages
                     .OrderByDescending(x => x.SentAt)
-                    .Select(x => new { x.Text, x.SentAt })
+                    .Select(x => new { x.Text, x.SentAt, x.Unsent })
                     .FirstOrDefault()
             })
             .ToListAsync();
 
         var unreadCounts = await _db.GroupMessages
             .AsNoTracking()
-            .Where(m => groupIds.Contains(m.GroupId) && m.SenderId != myId)
+            .Where(m => groupIds.Contains(m.GroupId) && m.SenderId != myId && !m.Unsent)
             .Select(m => new { m.GroupId, m.SentAt })
             .ToListAsync();
 
@@ -76,9 +76,10 @@ public class ChatController : ControllerBase
                     g.City,
                     g.MemberCount,
                     g.LastMessage?.SentAt,
-                    g.LastMessage?.Text,
+                    g.LastMessage is null || g.LastMessage.Unsent ? null : g.LastMessage.Text,
                     unread,
-                    g.CreatedByUserId == myId);
+                    g.CreatedByUserId == myId,
+                    g.LastMessage?.Unsent == true);
             })
             .OrderByDescending(g => g.LastMessageAt ?? DateTime.MinValue)
             .ThenBy(g => g.Name)
@@ -166,7 +167,8 @@ public class ChatController : ControllerBase
             null,
             null,
             0,
-            true));
+            true,
+            false));
     }
 
     [HttpGet("groups/{groupId:int}/messages")]
@@ -176,18 +178,24 @@ public class ChatController : ControllerBase
             .FirstOrDefaultAsync(m => m.GroupId == groupId && m.UserId == MyId);
         if (member is null) return Forbid();
 
-        var messages = await _db.GroupMessages
+        var rows = await _db.GroupMessages
             .AsNoTracking()
             .Where(m => m.GroupId == groupId)
             .OrderBy(m => m.SentAt)
-            .Select(m => new GroupMessageDto(
-                m.Id,
-                m.GroupId,
-                m.SenderId,
-                m.Sender!.DisplayName,
-                m.Text,
-                m.SentAt))
+            .Include(m => m.Sender)
+            .Include(m => m.Reactions)
+                .ThenInclude(r => r.User)
             .ToListAsync();
+
+        var messages = rows.Select(m => new GroupMessageDto(
+            m.Id,
+            m.GroupId,
+            m.SenderId,
+            m.Sender?.DisplayName ?? "",
+            m.Unsent ? "" : m.Text,
+            m.SentAt,
+            m.Unsent,
+            GroupChatMapper.ToReactionDtos(m.Reactions))).ToList();
 
         member.LastReadAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
@@ -248,7 +256,7 @@ public class ChatController : ControllerBase
 
         var messages = await _db.GroupMessages
             .AsNoTracking()
-            .Where(m => groupIds.Contains(m.GroupId) && m.SenderId != myId)
+            .Where(m => groupIds.Contains(m.GroupId) && m.SenderId != myId && !m.Unsent)
             .Select(m => new { m.GroupId, m.SentAt })
             .ToListAsync();
 

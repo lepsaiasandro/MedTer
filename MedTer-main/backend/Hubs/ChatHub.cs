@@ -88,8 +88,98 @@ public class ChatHub : Hub
             message.SenderId,
             sender?.DisplayName ?? "",
             message.Text,
-            message.SentAt);
+            message.SentAt,
+            false,
+            Array.Empty<MessageReactionDto>());
 
         await Clients.Group(GroupRoom(groupId)).SendAsync("ReceiveGroupMessage", dto);
+    }
+
+    public async Task ToggleReaction(int groupId, int messageId, string emoji)
+    {
+        if (!GroupChatMapper.AllowedEmoji(emoji)) return;
+
+        var isMember = await _db.ChatGroupMembers
+            .AnyAsync(m => m.GroupId == groupId && m.UserId == UserId);
+        if (!isMember) return;
+
+        var message = await _db.GroupMessages
+            .Include(m => m.Reactions)
+            .FirstOrDefaultAsync(m => m.Id == messageId && m.GroupId == groupId);
+        if (message is null || message.Unsent) return;
+
+        var existing = message.Reactions.FirstOrDefault(r => r.UserId == UserId);
+        if (existing is null)
+        {
+            message.Reactions.Add(new MessageReaction
+            {
+                UserId = UserId,
+                Emoji = emoji,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+        else if (existing.Emoji == emoji)
+        {
+            _db.MessageReactions.Remove(existing);
+        }
+        else
+        {
+            existing.Emoji = emoji;
+            existing.CreatedAt = DateTime.UtcNow;
+        }
+
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return;
+        }
+
+        var reactions = await _db.MessageReactions
+            .AsNoTracking()
+            .Where(r => r.MessageId == messageId)
+            .Include(r => r.User)
+            .ToListAsync();
+
+        await Clients.Group(GroupRoom(groupId)).SendAsync(
+            "MessageReactionsUpdated",
+            new MessageReactionsUpdatedDto(messageId, groupId, GroupChatMapper.ToReactionDtos(reactions)));
+    }
+
+    public async Task UnsendGroupMessage(int groupId, int messageId)
+    {
+        var isMember = await _db.ChatGroupMembers
+            .AnyAsync(m => m.GroupId == groupId && m.UserId == UserId);
+        if (!isMember) return;
+
+        var message = await _db.GroupMessages
+            .Include(m => m.Reactions)
+            .FirstOrDefaultAsync(m => m.Id == messageId && m.GroupId == groupId);
+        if (message is null || message.Unsent || message.SenderId != UserId) return;
+
+        message.Unsent = true;
+        message.UnsentAt = DateTime.UtcNow;
+        message.Text = "";
+        _db.MessageReactions.RemoveRange(message.Reactions);
+        await _db.SaveChangesAsync();
+
+        var last = await _db.GroupMessages
+            .AsNoTracking()
+            .Where(m => m.GroupId == groupId)
+            .OrderByDescending(m => m.SentAt)
+            .Select(m => new { m.Text, m.SentAt, m.Unsent })
+            .FirstOrDefaultAsync();
+
+        await Clients.Group(GroupRoom(groupId)).SendAsync(
+            "GroupMessageUnsent",
+            new GroupMessageUnsentDto(
+                message.Id,
+                groupId,
+                message.UnsentAt.Value,
+                last is null || last.Unsent ? null : last.Text,
+                last?.SentAt,
+                last?.Unsent == true));
     }
 }

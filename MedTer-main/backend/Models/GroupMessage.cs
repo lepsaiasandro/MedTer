@@ -12,4 +12,9 @@ public class GroupMessage
 
     public string Text { get; set; } = string.Empty;
     public DateTime SentAt { get; set; } = DateTime.UtcNow;
+
+    public bool Unsent { get; set; }
+    public DateTime? UnsentAt { get; set; }
+
+    public List<MessageReaction> Reactions { get; set; } = new();
 }

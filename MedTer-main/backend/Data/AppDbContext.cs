@@ -14,6 +14,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<ChatGroup> ChatGroups => Set<ChatGroup>();
     public DbSet<ChatGroupMember> ChatGroupMembers => Set<ChatGroupMember>();
     public DbSet<GroupMessage> GroupMessages => Set<GroupMessage>();
+    public DbSet<MessageReaction> MessageReactions => Set<MessageReaction>();
     public DbSet<Announcement> Announcements => Set<Announcement>();
     public DbSet<Interest> Interests => Set<Interest>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -98,6 +99,26 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
             .HasForeignKey(m => m.SenderId)
             .OnDelete(DeleteBehavior.NoAction);
         builder.Entity<GroupMessage>().HasIndex(m => new { m.GroupId, m.SentAt });
+        builder.Entity<GroupMessage>()
+            .Property(m => m.Unsent)
+            .HasDefaultValue(false);
+
+        builder.Entity<MessageReaction>()
+            .HasOne(r => r.Message)
+            .WithMany(m => m.Reactions)
+            .HasForeignKey(r => r.MessageId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<MessageReaction>()
+            .HasOne(r => r.User)
+            .WithMany()
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.NoAction);
+        builder.Entity<MessageReaction>()
+            .Property(r => r.Emoji)
+            .HasMaxLength(32);
+        builder.Entity<MessageReaction>()
+            .HasIndex(r => new { r.MessageId, r.UserId })
+            .IsUnique();
 
         builder.Entity<Announcement>()
             .HasOne(a => a.Center)

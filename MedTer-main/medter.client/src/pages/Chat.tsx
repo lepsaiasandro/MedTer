@@ -4,7 +4,7 @@ import * as signalR from "@microsoft/signalr";
 import api, { API_BASE } from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import { ArrowLeft, Paperclip, Plus, Search, Send, Smile, Users, X } from "../components/icons";
+import { ArrowLeft, Paperclip, Plus, Search, Send, Smile, Trash, Users, X } from "../components/icons";
 import { matchesSearch } from "../lib/search";
 
 interface ChatGroup {
@@ -18,6 +18,18 @@ interface ChatGroup {
   lastMessagePreview?: string | null;
   unreadCount: number;
   isOwner: boolean;
+  lastMessageUnsent?: boolean;
+}
+
+interface ReactionUser {
+  userId: string;
+  displayName: string;
+}
+
+interface MessageReaction {
+  emoji: string;
+  count: number;
+  users: ReactionUser[];
 }
 
 interface GroupMessage {
@@ -27,6 +39,22 @@ interface GroupMessage {
   senderName: string;
   text: string;
   sentAt: string;
+  unsent?: boolean;
+  reactions?: MessageReaction[];
+}
+
+interface UnsentEvent {
+  messageId: number;
+  groupId: number;
+  lastMessagePreview?: string | null;
+  lastMessageAt?: string | null;
+  lastMessageUnsent: boolean;
+}
+
+interface ReactionsEvent {
+  messageId: number;
+  groupId: number;
+  reactions: MessageReaction[];
 }
 
 interface GroupMember {
@@ -46,6 +74,7 @@ interface CreatableAnnouncement {
 const RECENT_KEY = "medter_group_recent";
 const MAX_RECENT = 8;
 const AVATAR_COLORS = ["#3b82f6", "#f59e0b", "#8b5cf6", "#14b8a6", "#ef4444", "#06b6d4"];
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 function colorFor(id: string) {
   let n = 0;
@@ -113,6 +142,7 @@ export default function Chat() {
   const [tab, setTab] = useState<"all" | "unread" | "groups">("all");
   const [creatable, setCreatable] = useState<CreatableAnnouncement[]>([]);
   const [creating, setCreating] = useState(false);
+  const [pickerId, setPickerId] = useState<number | null>(null);
 
   const connectionRef = useRef<signalR.HubConnection | null>(null);
   const activeRef = useRef<ChatGroup | null>(null);
@@ -166,11 +196,40 @@ export default function Chat() {
                 ...g,
                 lastMessageAt: msg.sentAt,
                 lastMessagePreview: msg.text,
+                lastMessageUnsent: false,
                 unreadCount: incoming && !inActive ? (g.unreadCount ?? 0) + 1 : g.unreadCount,
               }
             : g
         ))
       );
+    });
+
+    connection.on("MessageReactionsUpdated", (evt: ReactionsEvent) => {
+      const current = activeRef.current;
+      if (!current || evt.groupId !== current.id) return;
+      setMessages((prev) => prev.map((m) => (m.id === evt.messageId ? { ...m, reactions: evt.reactions } : m)));
+    });
+
+    connection.on("GroupMessageUnsent", (evt: UnsentEvent) => {
+      const current = activeRef.current;
+      if (current && evt.groupId === current.id) {
+        setMessages((prev) => prev.map((m) => (
+          m.id === evt.messageId ? { ...m, text: "", unsent: true, reactions: [] } : m
+        )));
+      }
+      setGroups((prev) =>
+        sortByRecent(prev.map((g) =>
+          g.id === evt.groupId
+            ? {
+                ...g,
+                lastMessageAt: evt.lastMessageAt,
+                lastMessagePreview: evt.lastMessagePreview,
+                lastMessageUnsent: evt.lastMessageUnsent,
+              }
+            : g
+        ))
+      );
+      setPickerId((id) => (id === evt.messageId ? null : id));
     });
 
     connection.start()
@@ -183,6 +242,7 @@ export default function Chat() {
 
   useEffect(() => {
     if (!active) return;
+    setPickerId(null);
     api.get<GroupMessage[]>(`/chat/groups/${active.id}/messages`).then((r) => setMessages(r.data));
     api.get<GroupMember[]>(`/chat/groups/${active.id}/members`).then((r) => setMembers(r.data));
     connectionRef.current?.invoke("JoinGroup", active.id).catch(() => {});
@@ -190,10 +250,11 @@ export default function Chat() {
     setShowMembers(false);
   }, [active]);
 
+  const lastMessageId = messages[messages.length - 1]?.id;
   useEffect(() => {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [lastMessageId, active?.id]);
 
   const pushRecent = (id: number) => {
     setRecentIds((prev) => {
@@ -274,6 +335,33 @@ export default function Chat() {
     setText("");
   };
 
+  const hubReady = () => {
+    const conn = connectionRef.current;
+    if (!conn || conn.state !== signalR.HubConnectionState.Connected) {
+      alert(t("კავშირი არ არის", "Not connected"));
+      return null;
+    }
+    return conn;
+  };
+
+  const reactTo = async (message: GroupMessage, emoji: string) => {
+    if (!active || message.unsent) return;
+    const conn = hubReady();
+    if (!conn) return;
+    await conn.invoke("ToggleReaction", active.id, message.id, emoji);
+    setPickerId(null);
+  };
+
+  const unsend = async (message: GroupMessage) => {
+    if (!active || message.unsent || message.senderId !== myId) return;
+    const ok = window.confirm(t("გავაუქმოთ ეს შეტყობინება ყველასთვის?", "Unsend this message for everyone?"));
+    if (!ok) return;
+    const conn = hubReady();
+    if (!conn) return;
+    await conn.invoke("UnsendGroupMessage", active.id, message.id);
+    setPickerId(null);
+  };
+
   const meta = (g: ChatGroup) => {
     const parts = [
       g.announcementType || t("ტრენინგი", "Training"),
@@ -303,7 +391,9 @@ export default function Chat() {
             <span className="ctime">{clock(g.lastMessageAt)}</span>
           </div>
           <div className="crole">
-            {g.lastMessagePreview || meta(g)}
+            {g.lastMessageUnsent
+              ? t("შეტყობინება გაუქმდა", "Message unsent")
+              : (g.lastMessagePreview || meta(g))}
           </div>
         </div>
         {unread > 0 && <span className="cbadge">{unread > 9 ? "9+" : unread}</span>}
@@ -467,7 +557,14 @@ export default function Chat() {
               </div>
             )}
 
-            <div ref={listRef} className="chat-msgs">
+            <div
+              ref={listRef}
+              className="chat-msgs"
+              onMouseDown={(e) => {
+                const el = e.target as HTMLElement;
+                if (!el.closest("[data-react]")) setPickerId(null);
+              }}
+            >
               {messages.length === 0 && (
                 <p className="contact-empty" style={{ margin: "auto" }}>{t("ჯერ შეტყობინებები არ არის", "No messages yet")}</p>
               )}
@@ -475,18 +572,83 @@ export default function Chat() {
                 const mine = m.senderId === myId;
                 const prev = messages[i - 1];
                 const showDay = !prev || dayLabel(prev.sentAt, lang) !== dayLabel(m.sentAt, lang);
+                const reactions = m.reactions ?? [];
+                const mineEmoji = (emoji: string) =>
+                  reactions.some((r) => r.emoji === emoji && r.users.some((u) => u.userId === myId));
                 return (
-                  <div key={m.id} className="msg-block">
+                  <div key={m.id} className={`msg-block${pickerId === m.id ? " menu-open" : ""}`}>
                     {showDay && <div className="msg-day">{dayLabel(m.sentAt, lang)}</div>}
                     <div className={`msg-row ${mine ? "me" : "them"}`}>
                       {!mine && <span className="cav" style={{ background: colorFor(m.senderId) }}>{initials(m.senderName)}</span>}
-                      <div className={`bubble ${mine ? "me" : "them"}`}>
-                        {!mine && <div className="bubble-name">{m.senderName}</div>}
-                        {m.text}
-                        <div className="bubble-meta">
-                          <span>{clock(m.sentAt)}</span>
-                          {mine && <span className="bubble-read">✓✓</span>}
+                      <div className="msg-col">
+                        {!m.unsent && pickerId === m.id && (
+                          <div className="react-picker" data-react="1">
+                            {REACTION_EMOJIS.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                className={mineEmoji(emoji) ? "on" : ""}
+                                onClick={() => void reactTo(m, emoji)}
+                                aria-label={emoji}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div className={`bubble ${mine ? "me" : "them"}${m.unsent ? " unsent" : ""}`}>
+                          {!mine && !m.unsent && <div className="bubble-name">{m.senderName}</div>}
+                          <div className="bubble-text">
+                            {m.unsent
+                              ? (mine
+                                ? t("შენ გააუქმე შეტყობინება", "You unsent a message")
+                                : t("შეტყობინება გაუქმდა", "Message unsent"))
+                              : m.text}
+                          </div>
+                          <div className="bubble-meta">
+                            <span>{clock(m.sentAt)}</span>
+                            {mine && !m.unsent && <span className="bubble-read">✓✓</span>}
+                            {!m.unsent && (
+                              <button
+                                type="button"
+                                className="bubble-act"
+                                data-react="1"
+                                aria-label={t("რეაქცია", "React")}
+                                onClick={() => setPickerId((id) => (id === m.id ? null : m.id))}
+                              >
+                                <Smile size={13} />
+                              </button>
+                            )}
+                            {mine && !m.unsent && (
+                              <button
+                                type="button"
+                                className="bubble-act"
+                                data-react="1"
+                                aria-label={t("გაუქმება", "Unsend")}
+                                title={t("გაუქმება ყველასთვის", "Unsend for everyone")}
+                                onClick={() => void unsend(m)}
+                              >
+                                <Trash size={13} />
+                              </button>
+                            )}
+                          </div>
                         </div>
+                        {reactions.length > 0 && !m.unsent && (
+                          <div className="msg-reacts">
+                            {reactions.map((r) => (
+                              <button
+                                key={r.emoji}
+                                type="button"
+                                className={`msg-react${mineEmoji(r.emoji) ? " mine" : ""}`}
+                                title={r.users.map((u) => u.displayName).filter(Boolean).join(", ")}
+                                onClick={() => void reactTo(m, r.emoji)}
+                              >
+                                <span>{r.emoji}</span>
+                                <span>{r.count}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       {mine && <span className="cav" style={{ background: colorFor(m.senderId) }}>{initials(m.senderName || user?.displayName || "")}</span>}
                     </div>

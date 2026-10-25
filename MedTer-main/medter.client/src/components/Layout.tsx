@@ -181,18 +181,15 @@ export default function Layout({ children }: { children: ReactNode }) {
         : location.pathname === "/announcements"
           ? "feed"
           : null;
-  const shellNav: NavItem[] | null = shell === "centers"
-    ? [
-        { to: user ? "/announcements" : "/", label: t("მთავარი", "Home") },
-        { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
-        { to: "/announcements", label: t("ტრენინგები", "Trainings") },
-        ...(user ? [{ to: "/profile", label: t("ჩემი სერტიფიკატები", "My certificates") }] : []),
-      ]
-    : shell === "feed"
+  const shellNav: NavItem[] | null = shell === "feed"
       ? [
           { to: "/announcements", label: t("ფიდი", "Feed") },
           { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
-          { to: user ? "/dashboard" : "/register", label: t("დაფა", "Board") },
+          ...(!user
+            ? [{ to: "/register", label: t("დაფა", "Board") }]
+            : isCenter
+              ? [{ to: "/dashboard", label: t("დაფა", "Dashboard") }]
+              : []),
         ]
       : shell === "chat"
         ? []
