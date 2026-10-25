@@ -115,6 +115,7 @@ function AnnouncementsFeed() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const isDoctor = user?.role === "Doctor";
+  const isCenter = user?.role === "TrainingCenter";
   const mineTab = isDoctor && searchParams.get("mine") === "1";
   const justRegistered = searchParams.get("welcome") === "1";
   const sponsored = useSponsoredCreatives("trainings");
@@ -504,6 +505,7 @@ function AnnouncementsFeed() {
           </div>
         )}
 
+        {isCenter && (
         <form className="social-compose" onSubmit={postNote}>
           <span className="dir-av social-me">{(user?.displayName || "?").charAt(0)}</span>
           <div>
@@ -524,8 +526,9 @@ function AnnouncementsFeed() {
             </div>
           </div>
         </form>
+        )}
 
-        {notes.map((note) => (
+        {isCenter && notes.map((note) => (
           <article key={note.id} className="social-post">
             <header>
               <span className="dir-av social-me">{(user?.displayName || "?").charAt(0)}</span>
