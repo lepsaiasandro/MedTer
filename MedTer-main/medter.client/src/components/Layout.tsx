@@ -6,6 +6,7 @@ import api from "../api";
 import { Bell, Chat, ChevronDown, Home, Cap, Sun, Moon, Menu, X } from "./icons";
 import LinearAdBanner from "./LinearAdBanner";
 import GlobalSearch from "./GlobalSearch";
+import ChatDock from "./ChatDock";
 import logoIcon from "../assets/medter-icon.png";
 
 interface Notif { id: number; text: string; isRead: boolean; createdAt: string; }
@@ -450,6 +451,8 @@ export default function Layout() {
       <LinearAdBanner />
 
       <main className="page"><Outlet /></main>
+
+      {user && <ChatDock />}
 
       {blockedModal && (
         <div className="modal" onClick={() => setBlockedModal(null)}>
