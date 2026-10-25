@@ -3137,6 +3137,7 @@
 .app.shell-chat .logo-name,
 .app.shell-feed .logo-name { color: #fff; letter-spacing: -0.4px; }
 .app.shell-centers .nav a,
+.app.shell-chat .nav a,
 .app.shell-feed .nav a {
   border-radius: 999px;
   padding: 8px 14px;
@@ -3144,9 +3145,20 @@
   font-weight: 650;
 }
 .app.shell-centers .nav a:hover,
+.app.shell-chat .nav a:hover,
 .app.shell-feed .nav a:hover { background: #18243a; color: #fff; }
 .app.shell-centers .nav a.active,
+.app.shell-chat .nav a.active,
 .app.shell-feed .nav a.active { background: #243656; color: #fff; }
+.app.shell-centers .icon-btn,
+.app.shell-chat .icon-btn,
+.app.shell-feed .icon-btn { color: #c9d4e4; }
+.app.shell-centers .icon-btn:hover,
+.app.shell-chat .icon-btn:hover,
+.app.shell-feed .icon-btn:hover,
+.app.shell-centers .icon-btn.active,
+.app.shell-chat .icon-btn.active,
+.app.shell-feed .icon-btn.active { background: #18243a; color: #fff; }
 .app.shell-centers .profile-meta,
 .app.shell-chat .profile-meta,
 .app.shell-feed .profile-meta { display: none; }

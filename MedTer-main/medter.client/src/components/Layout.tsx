@@ -173,28 +173,61 @@ export default function Layout({ children }: { children: ReactNode }) {
     : "#";
 
   const homeTo = isGuest || isAdmin ? "/" : "/announcements";
+  const path = location.pathname;
+  const isCenterList = path === "/centers";
+  const isCenterDetail = path.startsWith("/centers/");
+  const isFeed = path === "/announcements";
+  const isChat = path === "/chat";
+  const isDash = path === "/dashboard" || path === "/my-announcements";
+  const isProfile = path === "/profile" || path === "/certificates";
   const shell: "centers" | "chat" | "feed" | null =
-    location.pathname === "/centers" || location.pathname.startsWith("/centers/")
-      ? "centers"
-      : location.pathname === "/chat"
-        ? "chat"
-        : location.pathname === "/announcements"
-          ? "feed"
-          : null;
-  const shellNav: NavItem[] | null = shell === "feed"
+    isCenterList ? "centers" : isChat ? "chat" : isFeed ? "feed" : null;
+
+  const chatLink: NavItem[] = user ? [{ to: "/chat", label: t("ჩატი", "Chat") }] : [];
+  const centersLink: NavItem = { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") };
+  const pageNav: NavItem[] | null = isFeed
+    ? [
+        { to: "/announcements", label: t("ფიდი", "Feed") },
+        centersLink,
+        ...chatLink,
+        ...(isCenter ? [{ to: "/dashboard", label: t("დაფა", "Dashboard") }] : []),
+        ...(!user ? [{ to: "/register", label: t("რეგისტრაცია", "Register") }] : []),
+      ]
+    : isCenterList
       ? [
-          { to: "/announcements", label: t("ფიდი", "Feed") },
-          { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
-          ...(!user
-            ? [{ to: "/register", label: t("დაფა", "Board") }]
-            : isCenter
-              ? [{ to: "/dashboard", label: t("დაფა", "Dashboard") }]
-              : []),
+          { to: user ? "/announcements" : "/", label: t("მთავარი", "Home") },
+          { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
+          ...chatLink,
         ]
-      : shell === "chat"
-        ? []
-        : null;
-  const navItems = shellNav ?? nav;
+      : isCenterDetail
+        ? [
+            { to: "/centers", label: t("ყველა ცენტრი", "All centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
+            ...chatLink,
+            ...(user ? [{ to: "/profile", label: t("პროფილი", "Profile") }] : []),
+          ]
+        : isChat
+          ? [
+              { to: user ? "/announcements" : "/", label: t("ფიდი", "Feed") },
+              centersLink,
+              { to: "/chat", label: t("ჩატი", "Chat") },
+            ]
+          : isDash
+            ? [
+                { to: "/announcements", label: t("ტრენინგები", "Trainings") },
+                centersLink,
+                { to: "/dashboard", label: t("დაფა", "Dashboard") },
+                ...chatLink,
+              ]
+            : isProfile && !isAdmin
+              ? [
+                  { to: "/announcements", label: t("ტრენინგები", "Trainings") },
+                  centersLink,
+                  ...chatLink,
+                  { to: "/profile", label: t("პროფილი", "Profile") },
+                  ...(isCenter ? [{ to: "/dashboard", label: t("დაფა", "Dashboard") }] : []),
+                ]
+              : null;
+  const navItems = pageNav ?? nav;
   const footerLinks = isGuest
     ? [
         { to: "/", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
@@ -293,7 +326,12 @@ export default function Layout({ children }: { children: ReactNode }) {
                   )}
                 </div>
 
-                <Link to="/chat" className="icon-btn" aria-label={t("შეტყობინებები", "Messages")} hidden={!!shell}>
+                <Link
+                  to="/chat"
+                  className={`icon-btn${location.pathname === "/chat" ? " active" : ""}`}
+                  aria-label={t("შეტყობინებები", "Messages")}
+                  aria-current={location.pathname === "/chat" ? "page" : undefined}
+                >
                   {unreadMsgs > 0 && <span className="dot">{unreadMsgs > 9 ? "9+" : unreadMsgs}</span>}
                   <Chat size={21} />
                 </Link>
