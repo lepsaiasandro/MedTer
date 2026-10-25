@@ -176,8 +176,22 @@ export default function Register() {
     ? (form.firstName || form.lastName || "?").charAt(0)
     : (form.name || "?").charAt(0);
 
+  const leave = () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx;
+    if (typeof idx === "number" && idx > 0) navigate(-1);
+    else navigate("/");
+  };
+
+  const backButton = (extra = "") => (
+    <button type="button" className={`auth-page-back${extra ? ` ${extra}` : ""}`} onClick={leave}>
+      <ArrowLeft size={16} />
+      {t("უკან", "Back")}
+    </button>
+  );
+
   const brandPanel = (
     <aside className="auth-brand-panel">
+      {backButton()}
       <div className="auth-brand-top">
         <img src={logoIcon} alt="" className="auth-brand-logo" />
         <div className="logo-name" style={{ fontSize: 26, color: "#fff" }}>Med<span style={{ color: "#93c5fd" }}>Ter</span></div>
@@ -203,24 +217,17 @@ export default function Register() {
     </aside>
   );
 
-  const leave = () => {
-    const idx = (window.history.state as { idx?: number } | null)?.idx;
-    if (typeof idx === "number" && idx > 0) navigate(-1);
-    else navigate("/");
-  };
-
   if (done) {
     return (
       <div className="auth-shell">
-        <button type="button" className="auth-page-back" onClick={leave}>
-          <ArrowLeft size={16} />
-          {t("უკან", "Back")}
-        </button>
-        <AuthPrefs />
         {brandPanel}
         <div className="auth-wrap auth-wrap--panel">
+          <div className="auth-side-head">
+            {backButton("auth-page-back--side")}
+            <AuthPrefs />
+          </div>
+          <LinearAdBanner compact />
           <div className="auth-panel-col">
-            <LinearAdBanner compact />
             <div className="auth-card" style={{ textAlign: "center" }}>
               <div className="auth-logo auth-logo--mobile">
                 <img src={logoIcon} alt="" className="logo-mark-img" />
@@ -265,15 +272,14 @@ export default function Register() {
 
   return (
     <div className="auth-shell">
-      <button type="button" className="auth-page-back" onClick={leave}>
-        <ArrowLeft size={16} />
-        {t("უკან", "Back")}
-      </button>
-      <AuthPrefs />
       {brandPanel}
       <div className="auth-wrap auth-wrap--panel">
+        <div className="auth-side-head">
+          {backButton("auth-page-back--side")}
+          <AuthPrefs />
+        </div>
+        <LinearAdBanner compact />
         <div className="auth-panel-col">
-          <LinearAdBanner compact />
           <div className="auth-card">
             <div className="auth-logo auth-logo--mobile">
               <img src={logoIcon} alt="" className="logo-mark-img" />

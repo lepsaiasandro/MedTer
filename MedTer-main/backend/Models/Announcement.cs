@@ -40,4 +40,5 @@ public class Announcement
     public ApplicationUser? Center { get; set; }
 
     public List<Interest> Interests { get; set; } = new();
+    public List<AnnouncementLike> Likes { get; set; } = new();
 }

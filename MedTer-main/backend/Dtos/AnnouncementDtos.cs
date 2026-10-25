@@ -46,7 +46,9 @@ public record AnnouncementDto(
     DateTime CreatedAt = default,
     bool HasGroupChat = false,
     /// <summary>Meeting link / exact venue — only populated for registered doctors and owners.</summary>
-    string? MeetingAccess = null);
+    string? MeetingAccess = null,
+    int LikeCount = 0,
+    bool IsLiked = false);
 
 // A doctor who marked interest (shown to the owning center).
 public record InterestedDoctorDto(

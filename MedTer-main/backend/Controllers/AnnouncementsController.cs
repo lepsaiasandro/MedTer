@@ -47,7 +47,9 @@ public class AnnouncementsController : ControllerBase
                 _db.Favorites.Any(f => f.AnnouncementId == a.Id && f.DoctorUserId == myId),
                 a.CreatedAt,
                 false,
-                a.Interests.Any(i => i.DoctorUserId == myId) ? a.MeetingAccess : null))
+                a.Interests.Any(i => i.DoctorUserId == myId) ? a.MeetingAccess : null,
+                a.Likes.Count,
+                myId != null && a.Likes.Any(l => l.UserId == myId)))
             .ToListAsync();
 
         return Ok(list);
@@ -70,7 +72,9 @@ public class AnnouncementsController : ControllerBase
                 a.CenterUserId, a.Center!.DisplayName,
                 a.Interests.Count, false, false, a.CreatedAt,
                 _db.ChatGroups.Any(g => g.AnnouncementId == a.Id),
-                a.MeetingAccess))
+                a.MeetingAccess,
+                a.Likes.Count,
+                a.Likes.Any(l => l.UserId == myId)))
             .ToListAsync();
 
         return Ok(list);
@@ -99,7 +103,9 @@ public class AnnouncementsController : ControllerBase
                 _db.Favorites.Any(f => f.AnnouncementId == i.AnnouncementId && f.DoctorUserId == myId),
                 i.Announcement.CreatedAt,
                 _db.ChatGroups.Any(g => g.AnnouncementId == i.AnnouncementId),
-                i.Announcement.MeetingAccess))
+                i.Announcement.MeetingAccess,
+                i.Announcement.Likes.Count,
+                i.Announcement.Likes.Any(l => l.UserId == myId)))
             .ToListAsync();
 
         return Ok(list);
@@ -319,6 +325,38 @@ public class AnnouncementsController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpPost("{id}/like")]
+    public async Task<IActionResult> AddLike(int id)
+    {
+        var myId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(myId)) return Unauthorized();
+
+        var exists = await _db.AnnouncementLikes.AnyAsync(l => l.AnnouncementId == id && l.UserId == myId);
+        if (!exists)
+        {
+            var announcementExists = await _db.Announcements.AnyAsync(a => a.Id == id);
+            if (!announcementExists) return NotFound();
+            _db.AnnouncementLikes.Add(new AnnouncementLike { AnnouncementId = id, UserId = myId });
+            await _db.SaveChangesAsync();
+        }
+        return Ok();
+    }
+
+    [HttpDelete("{id}/like")]
+    public async Task<IActionResult> RemoveLike(int id)
+    {
+        var myId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(myId)) return Unauthorized();
+
+        var like = await _db.AnnouncementLikes.FirstOrDefaultAsync(l => l.AnnouncementId == id && l.UserId == myId);
+        if (like is not null)
+        {
+            _db.AnnouncementLikes.Remove(like);
+            await _db.SaveChangesAsync();
+        }
         return Ok();
     }
 

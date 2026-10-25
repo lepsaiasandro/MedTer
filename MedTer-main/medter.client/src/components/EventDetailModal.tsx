@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { usePrefs } from "../i18n";
 import ShareMenu from "./ShareMenu";
-import { Calendar, Pin, Check, Cap, Chat, Bookmark, Video } from "./icons";
+import { Calendar, Pin, Check, Cap, Chat, Bookmark, Video, ThumbUp } from "./icons";
 import { pickCardBanner } from "../lib/cardBanners";
 
 export interface EventDetailData {
@@ -27,6 +27,9 @@ export interface EventDetailData {
   isInterested: boolean;
   isFavorite: boolean;
   hasGroupChat?: boolean;
+  createdAt?: string;
+  likeCount?: number;
+  isLiked?: boolean;
 }
 
 type Props = {
@@ -42,13 +45,14 @@ type Props = {
   onClose: () => void;
   onStop: (e: React.MouseEvent | React.KeyboardEvent) => void;
   onSave: () => void;
+  onLike: () => void;
   onGoing: () => void;
   onChat: () => void;
 };
 
 export default function EventDetailModal({
   a, isDoctor, mineTab, busyId, whenFull, placeLabel, dateParts, fmtDate,
-  meetingAccess, onClose, onStop, onSave, onGoing, onChat,
+  meetingAccess, onClose, onStop, onSave, onLike, onGoing, onChat,
 }: Props) {
   const { t } = usePrefs();
   const cover = pickCardBanner(a.id, a.imageUrl);
@@ -94,13 +98,14 @@ export default function EventDetailModal({
             )}
           </div>
 
-          {a.interestedCount > 0 && (
-            <div className="fb-event-page-guests">
-              <div className="fb-event-guest-counts">
+          <div className="fb-event-page-guests">
+            <div className="fb-event-guest-counts">
+              <b className="social-like-count"><ThumbUp size={14} filled /> {a.likeCount ?? 0} {t("ლაიქი", "likes")}</b>
+              {a.interestedCount > 0 && (
                 <b>{a.interestedCount} {t("მიდის", "going")}</b>
-              </div>
+              )}
             </div>
-          )}
+          </div>
 
           <div className="fb-event-actions fb-event-page-rsvp">
             {isDoctor && (
@@ -109,6 +114,10 @@ export default function EventDetailModal({
                 {going ? t("რეგისტრირებული", "Registered") : t("რეგისტრაცია", "Register")}
               </button>
             )}
+            <button type="button" className={`fb-rsvp${a.isLiked ? " active like" : ""}`} onClick={onLike}>
+              <ThumbUp size={16} filled={a.isLiked} />
+              {a.isLiked ? t("მოგწონს", "Liked") : t("ლაიქი", "Like")}
+            </button>
             {isDoctor && (
               <button type="button" className={`fb-rsvp${a.isFavorite ? " active saved" : ""}`} disabled={busyId === a.id} onClick={onSave}>
                 <Bookmark size={16} filled={a.isFavorite} />
@@ -186,6 +195,15 @@ export default function EventDetailModal({
                     <div>
                       <b>{a.language}</b>
                       <span>{t("ენა", "Language")}</span>
+                    </div>
+                  </li>
+                )}
+                {a.createdAt && (
+                  <li>
+                    <Calendar size={18} />
+                    <div>
+                      <b>{fmtDate(a.createdAt)}</b>
+                      <span>{t("გამოქვეყნების თარიღი", "Published")}</span>
                     </div>
                   </li>
                 )}

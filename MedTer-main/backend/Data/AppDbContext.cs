@@ -21,6 +21,7 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Rating> Ratings => Set<Rating>();
     public DbSet<Certificate> Certificates => Set<Certificate>();
     public DbSet<Favorite> Favorites => Set<Favorite>();
+    public DbSet<AnnouncementLike> AnnouncementLikes => Set<AnnouncementLike>();
     public DbSet<ProfileChangeRequest> ProfileChangeRequests => Set<ProfileChangeRequest>();
     public DbSet<AppSettings> AppSettings => Set<AppSettings>();
     public DbSet<AdBanner> AdBanners => Set<AdBanner>();
@@ -167,6 +168,13 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<Favorite>()
             .HasOne(f => f.Doctor).WithMany().HasForeignKey(f => f.DoctorUserId).OnDelete(DeleteBehavior.NoAction);
         builder.Entity<Favorite>().HasIndex(f => new { f.AnnouncementId, f.DoctorUserId }).IsUnique();
+
+        // Likes — one per (user, announcement).
+        builder.Entity<AnnouncementLike>()
+            .HasOne(l => l.Announcement).WithMany(a => a.Likes).HasForeignKey(l => l.AnnouncementId).OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<AnnouncementLike>()
+            .HasOne(l => l.User).WithMany().HasForeignKey(l => l.UserId).OnDelete(DeleteBehavior.NoAction);
+        builder.Entity<AnnouncementLike>().HasIndex(l => new { l.AnnouncementId, l.UserId }).IsUnique();
 
         builder.Entity<AdBanner>().HasIndex(a => new { a.IsActive, a.SortOrder });
     }

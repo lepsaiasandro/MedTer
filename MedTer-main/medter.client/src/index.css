@@ -132,9 +132,7 @@
 }
 
 @layer components {
-  /* ===== ambient animated background (medical pulse) =====
-     Idle by default — CSS animations run only with .ambient--live
-     (triggered ~4s after click / key / touch). */
+  /* ===== ambient animated background (medical pulse) ===== */
   .ambient {
     position: fixed; inset: 0; z-index: 0;
     pointer-events: none; overflow: hidden;
@@ -221,45 +219,39 @@
     mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 20%, transparent 75%);
   }
 
-  /* ---- live (interaction-only) animations ---- */
-  .ambient--live .ambient-mesh {
+  .ambient .ambient-mesh {
     animation: ambient-mesh-drift 28s ease-in-out infinite alternate;
   }
-  .ambient--live .ambient-orb-a {
+  .ambient .ambient-orb-a {
     will-change: transform, filter;
     animation: ambient-float-a 22s ease-in-out infinite, ambient-heartbeat-glow 1.6s ease-in-out infinite;
   }
-  .ambient--live .ambient-orb-b {
+  .ambient .ambient-orb-b {
     will-change: transform;
     animation: ambient-float-b 26s ease-in-out infinite;
   }
-  .ambient--live .ambient-orb-c {
+  .ambient .ambient-orb-c {
     will-change: transform;
     animation: ambient-float-c 30s ease-in-out infinite;
   }
-  .ambient--live .ambient-vital-1 { animation: ambient-vital-ring 2.4s ease-out infinite; }
-  .ambient--live .ambient-vital-2 { animation: ambient-vital-ring 2.4s ease-out infinite 0.35s; }
-  .ambient--live .ambient-vital-3 { animation: ambient-vital-ring 2.4s ease-out infinite 0.7s; }
-  .ambient--live .ambient-heartbeat { animation: ambient-lubdub 1.2s ease-in-out infinite; }
-  .ambient--live .ambient-ecg { opacity: 0.55; }
-  .ambient--live .ambient-ecg-path {
+  .ambient .ambient-vital-1 { animation: ambient-vital-ring 2.4s ease-out infinite; }
+  .ambient .ambient-vital-2 { animation: ambient-vital-ring 2.4s ease-out infinite 0.35s; }
+  .ambient .ambient-vital-3 { animation: ambient-vital-ring 2.4s ease-out infinite 0.7s; }
+  .ambient .ambient-heartbeat { animation: ambient-lubdub 1.2s ease-in-out infinite; }
+  .ambient .ambient-ecg { opacity: 0.55; }
+  .ambient .ambient-ecg-path {
     stroke-dasharray: 420 1800;
     animation: ambient-ecg-draw 4.8s linear infinite;
     opacity: 0.45;
   }
-  :root[data-theme="dark"] .ambient--live .ambient-ecg-path {
+  :root[data-theme="dark"] .ambient .ambient-ecg-path {
     opacity: 0.55;
     filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.35));
   }
-  .ambient--live .ambient-dots {
+  .ambient .ambient-dots {
     opacity: 0.28;
     animation: ambient-dots-drift 40s linear infinite;
   }
-
-  /* Quiet ambient on dense app pages — mesh/orbs only, dimmed */
-  .ambient--quiet .ambient-orb { opacity: 0.45; }
-  .ambient--quiet .ambient-mesh { opacity: 0.7; }
-  .ambient--quiet .ambient-dots { opacity: 0.12; }
 
   @keyframes ambient-float-a {
     0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
@@ -308,12 +300,12 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .ambient--live .ambient-orb,
-    .ambient--live .ambient-mesh,
-    .ambient--live .ambient-vital,
-    .ambient--live .ambient-heartbeat,
-    .ambient--live .ambient-ecg-path,
-    .ambient--live .ambient-dots {
+    .ambient .ambient-orb,
+    .ambient .ambient-mesh,
+    .ambient .ambient-vital,
+    .ambient .ambient-heartbeat,
+    .ambient .ambient-ecg-path,
+    .ambient .ambient-dots {
       animation: none !important;
       will-change: auto !important;
     }
@@ -458,63 +450,64 @@
     .partner-strip-copy strong { font-size: 16px; }
     .partner-strip-copy span { -webkit-line-clamp: 2; font-size: 13px; }
     .partner-strip-cta { width: 100%; margin-top: 4px; padding: 12px 16px; }
+    .partner-strip--compact .partner-strip-card { flex-wrap: wrap; }
+    .partner-strip--compact .partner-strip-cta { width: 100%; margin-top: 4px; }
   }
 
   .partner-strip--compact {
-    position: fixed;
-    top: 72px;
-    right: 14px;
-    z-index: 19;
-    width: min(248px, calc(100vw - 120px));
+    position: relative;
+    top: auto;
+    right: auto;
+    z-index: 1;
+    width: 100%;
     min-height: 0;
     margin: 0;
-    padding: 0;
+    padding: 0 var(--gutter) 4px;
   }
   .partner-strip--compact .partner-strip-inner { max-width: none; }
   .partner-strip--compact .partner-strip-label {
     position: static;
     display: block;
     width: fit-content;
-    margin: 0 0 4px auto;
+    margin: 0 0 6px 2px;
     padding: 0;
     color: var(--muted);
     background: transparent;
     font-size: 10px;
   }
   .partner-strip--compact .partner-strip-card {
-    min-height: 0;
+    width: 100%;
+    min-height: 84px;
     flex-wrap: nowrap;
-    gap: 8px;
-    padding: 8px 10px;
-    border-radius: 12px;
+    gap: 16px;
+    padding: 14px 16px;
+    border-radius: 14px;
     align-items: center;
   }
   .partner-strip--compact .partner-strip-mark {
-    width: 36px;
-    min-height: 36px;
+    width: 84px;
+    min-height: 56px;
     align-self: center;
-    border-radius: 8px;
-    font-size: 13px;
+    border-radius: 12px;
+    font-size: 18px;
   }
-  .partner-strip--compact .partner-strip-mark.has-logo { padding: 3px; }
-  .partner-strip--compact .partner-strip-logo { max-width: 30px; max-height: 28px; }
-  .partner-strip--compact .partner-strip-copy { gap: 0; padding-left: 0; }
-  .partner-strip--compact .partner-strip-copy strong {
-    font-size: 12.5px;
+  .partner-strip--compact .partner-strip-mark.has-logo { padding: 8px; }
+  .partner-strip--compact .partner-strip-logo { max-width: 68px; max-height: 44px; }
+  .partner-strip--compact .partner-strip-copy { gap: 4px; padding-left: 0; }
+  .partner-strip--compact .partner-strip-copy strong { font-size: 16px; }
+  .partner-strip--compact .partner-strip-copy span {
+    display: -webkit-box;
     -webkit-line-clamp: 2;
+    font-size: 13.5px;
   }
-  .partner-strip--compact .partner-strip-copy span { display: none; }
   .partner-strip--compact .partner-strip-cta {
-    padding: 6px 8px;
-    font-size: 11px;
+    padding: 10px 16px;
+    font-size: 13.5px;
   }
   .partner-strip--compact .partner-strip-dots {
-    margin-top: 6px;
-    gap: 5px;
+    margin-top: 8px;
     justify-content: flex-end;
   }
-  .partner-strip--compact .partner-strip-dots button { width: 7px; height: 7px; }
-  .partner-strip--compact .partner-strip-count { font-size: 11px; }
 
   /* ===== top bar ===== */
   .topbar {
@@ -2598,29 +2591,36 @@
     display: grid; grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.05fr);
   }
   .auth-prefs {
-    position: fixed; top: 14px; right: 14px; z-index: 20;
+    position: static; z-index: 2;
     display: flex; gap: 2px;
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--r-sm); padding: 2px; box-shadow: var(--sh-sm);
   }
+  .auth-side-head {
+    display: flex; align-items: center; justify-content: flex-end;
+    width: 100%; gap: 8px;
+    padding: 14px var(--gutter) 10px;
+  }
   .auth-page-back {
-    position: fixed; top: 14px; left: 14px; z-index: 20;
+    position: absolute; top: 20px; left: 20px; z-index: 2;
     display: inline-flex; align-items: center; gap: 6px;
     height: 40px; padding: 0 12px 0 10px;
-    border-radius: var(--r-sm); border: 1px solid var(--border);
-    background: var(--surface); color: var(--text);
+    border-radius: var(--r-sm); border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.96); color: var(--text);
     box-shadow: var(--sh-sm); font-size: 13.5px; font-weight: 700;
     cursor: pointer;
   }
   .auth-page-back:hover { color: var(--brand); border-color: color-mix(in srgb, var(--brand) 40%, var(--border)); }
+  .auth-page-back--side { display: none; }
   .auth-panel-col {
     width: min(100%, 480px);
-    display: flex; flex-direction: column; align-items: flex-end; gap: 12px;
+    margin: 16px auto 0;
+    display: flex; flex-direction: column; align-items: stretch; gap: 12px;
   }
   .auth-panel-col > .auth-card { width: 100%; }
   .auth-brand-panel {
-    display: flex; flex-direction: column; justify-content: center;
-    padding: clamp(28px, 5vw, 56px) clamp(28px, 5vw, 56px) clamp(20px, 3vw, 28px);
+    display: flex; flex-direction: column; justify-content: flex-start;
+    padding: 84px clamp(28px, 5vw, 56px) clamp(20px, 3vw, 28px);
     background: linear-gradient(160deg, var(--brand) 0%, var(--brand-700) 50%, var(--navy) 120%);
     color: #fff; position: relative; overflow: hidden; min-height: 100%;
   }
@@ -2699,9 +2699,11 @@
   .auth-wrap.auth-wrap--panel {
     height: auto;
     min-height: 100vh; min-height: 100dvh;
-    align-items: start;
-    justify-items: center;
-    padding: 188px var(--gutter) 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 0 0 32px;
   }
   .auth-card { width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--sh-lg); padding: clamp(20px, 4vw, 32px); }
   .auth-logo { display: flex; align-items: center; gap: 10px; justify-content: center; margin-bottom: 12px; }
@@ -3075,7 +3077,12 @@
     .auth-shell { grid-template-columns: 1fr; }
     .auth-brand-panel { display: none; }
     .auth-logo--mobile { display: flex; }
-    .auth-wrap.auth-wrap--panel { padding-top: 188px; }
+    .auth-page-back--side {
+      display: inline-flex;
+      position: static;
+      border-color: var(--border);
+    }
+    .auth-side-head { justify-content: space-between; }
     .auth-step-label { display: none; }
     .auth-stepper { gap: 8px; }
   }
@@ -3435,8 +3442,11 @@
 .social-seats i { display: block; height: 6px; border-radius: 999px; background: linear-gradient(90deg, #f59e0b, #fbbf24); }
 .social-seats span { position: absolute; left: 0; top: 10px; color: #8ea0ba; font-size: 11px; }
 .social-embed .btn { border-radius: 999px; align-self: flex-end; margin-top: 4px; white-space: nowrap; }
-.social-stats { display: flex; justify-content: space-between; color: var(--muted); font-size: 12.5px; padding: 0 4px; }
+.social-stats { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12.5px; padding: 0 4px; }
+.social-like-count { display: inline-flex; align-items: center; gap: 4px; }
+.social-like-count svg { color: #1877f2; }
 .social-actions { display: flex; border-top: 1px solid var(--border); padding-top: 6px; }
+.social-actions button.liked { color: #1877f2; }
 .social-actions button, .social-actions .share-btn {
   flex: 1; border: none; background: none; color: var(--text-body);
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;

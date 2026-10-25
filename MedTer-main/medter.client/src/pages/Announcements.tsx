@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import { Calendar, Pin, Search, Check, Bookmark, Cap, Chat, X, ExternalLink, Home, Users } from "../components/icons";
+import { Calendar, Pin, Search, Check, Bookmark, Cap, Chat, X, ExternalLink, Home, Users, ThumbUp } from "../components/icons";
 import ShareMenu from "../components/ShareMenu";
 import EmptyState from "../components/EmptyState";
 import { useSponsoredCreatives } from "../components/LinearAdBanner";
@@ -38,6 +38,9 @@ interface Announcement {
   isInterested: boolean;
   isFavorite: boolean;
   hasGroupChat?: boolean;
+  createdAt?: string;
+  likeCount: number;
+  isLiked: boolean;
 }
 
 interface InterestResponse {
@@ -126,8 +129,8 @@ function AnnouncementsFeed() {
   const [sort, setSort] = useState(() => searchParams.get("sort") || "date");
   const [when, setWhen] = useState<WhenFilter>(() => {
     const w = searchParams.get("when");
-    if (w === "week" || w === "month" || w === "past" || w === "all") return w;
-    return "upcoming";
+    if (w === "week" || w === "month" || w === "past" || w === "upcoming") return w;
+    return "all";
   });
   const [savedOnly, setSavedOnly] = useState(() => searchParams.get("saved") === "1" || searchParams.get("fav") === "1");
 
@@ -235,7 +238,7 @@ function AnnouncementsFeed() {
         val === null ||
         val === "" ||
         (key === "sort" && val === "date") ||
-        (key === "when" && val === "upcoming") ||
+        (key === "when" && val === "all") ||
         ((key === "saved" || key === "fav") && val !== "1");
       if (drop) next.delete(key);
       else next.set(key, val);
@@ -353,6 +356,18 @@ function AnnouncementsFeed() {
     }
   };
 
+  const toggleLike = async (a: Announcement) => {
+    const next = !a.isLiked;
+    const nextCount = Math.max(0, (a.likeCount ?? 0) + (next ? 1 : -1));
+    patchLists(a.id, { isLiked: next, likeCount: nextCount });
+    try {
+      if (a.isLiked) await api.delete(`/announcements/${a.id}/like`);
+      else await api.post(`/announcements/${a.id}/like`);
+    } catch {
+      patchLists(a.id, { isLiked: a.isLiked, likeCount: a.likeCount });
+    }
+  };
+
   const stopCard = (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
   };
@@ -380,8 +395,20 @@ function AnnouncementsFeed() {
     });
     if (sort === "points") list = [...list].sort((a, b) => b.points - a.points);
     else if (sort === "interested") list = [...list].sort((a, b) => b.interestedCount - a.interestedCount);
+    else if (sort === "likes") list = [...list].sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0) || b.id - a.id);
     else if (when === "past") {
       list = [...list].sort((a, b) => new Date(b.startDate ?? 0).getTime() - new Date(a.startDate ?? 0).getTime() || b.id - a.id);
+    } else if (when === "all") {
+      const today = startOfDay(new Date());
+      list = [...list].sort((a, b) => {
+        const at = a.startDate ? new Date(a.startDate).getTime() : Number.POSITIVE_INFINITY;
+        const bt = b.startDate ? new Date(b.startDate).getTime() : Number.POSITIVE_INFINITY;
+        const aPast = at < today;
+        const bPast = bt < today;
+        if (aPast !== bPast) return aPast ? 1 : -1;
+        if (aPast) return bt - at || b.id - a.id;
+        return at - bt || b.id - a.id;
+      });
     } else {
       list = [...list].sort((a, b) => new Date(a.startDate ?? Number.MAX_SAFE_INTEGER).getTime() - new Date(b.startDate ?? Number.MAX_SAFE_INTEGER).getTime() || b.id - a.id);
     }
@@ -399,11 +426,10 @@ function AnnouncementsFeed() {
     return [...map.entries()];
   }, [visible]);
 
-  const hasFilters = Boolean(search || category || format || city || savedOnly || when !== "upcoming");
-  const onlyPeriodEmpty = !search && !category && !format && !city && !savedOnly && when !== "all";
+  const hasFilters = Boolean(search || category || format || city || savedOnly || when !== "all");
 
   const clearFilters = () => {
-    setSearch(""); setCategory(""); setFormat(""); setCity(""); setSavedOnly(false); setWhen("upcoming");
+    setSearch(""); setCategory(""); setFormat(""); setCity(""); setSavedOnly(false); setWhen("all");
     writeFilterParams({ q: null, cat: null, format: null, city: null, saved: null, when: null });
   };
 
@@ -417,7 +443,7 @@ function AnnouncementsFeed() {
 
   const activeChips: FilterChip[] = [
     search ? { id: "q", label: `\u201C${search.trim()}\u201D`, onClear: () => setSearchQ("") } : null,
-    when !== "upcoming" ? { id: "when", label: whenLabel(when), onClear: () => setWhenQ("upcoming") } : null,
+    when !== "all" ? { id: "when", label: whenLabel(when), onClear: () => setWhenQ("all") } : null,
     category ? { id: "cat", label: category, onClear: () => setCategoryQ("") } : null,
     format ? {
       id: "format",
@@ -543,6 +569,7 @@ function AnnouncementsFeed() {
                   { value: "date", label: t("თარიღით", "By date") },
                   { value: "points", label: t("ქულით", "By points") },
                   { value: "interested", label: t("პოპულარობით", "By popularity") },
+                  { value: "likes", label: t("ლაიქებით", "By likes") },
                 ]}
                 aria-label={t("დალაგება", "Sort")}
               />
@@ -608,26 +635,12 @@ function AnnouncementsFeed() {
         ) : visible.length === 0 ? (
           <EmptyState
             icon={<Search size={42} sw={1.6} />}
-            title={
-              onlyPeriodEmpty
-                ? t("ამ პერიოდში ტრენინგი არ არის", "No trainings in this period")
-                : t("ვერაფერი მოიძებნა", "Nothing found")
-            }
-            text={
-              onlyPeriodEmpty
-                ? t("ნახე ყველა ტრენინგი ან შეცვალე პერიოდი.", "View all trainings or change the period.")
-                : t("შეცვალე ფილტრები ან პერიოდი.", "Try different filters or period.")
-            }
+            title={t("ვერაფერი მოიძებნა", "Nothing found")}
+            text={t("შეცვალე ფილტრები.", "Try different filters.")}
             action={
-              onlyPeriodEmpty ? (
-                <button className="btn btn-primary btn-sm" onClick={() => setWhenQ("all")}>
-                  {t("ყველას ნახვა", "View all")}
-                </button>
-              ) : (
-                <button className="btn btn-ghost btn-sm" onClick={clearFilters}>
-                  {t("გასუფთავება", "Clear")}
-                </button>
-              )
+              <button className="btn btn-ghost btn-sm" onClick={clearFilters}>
+                {t("გასუფთავება", "Clear")}
+              </button>
             }
           />
         ) : (
@@ -666,7 +679,11 @@ function AnnouncementsFeed() {
                               ) : a.centerName}
                               <Check size={13} />
                             </b>
-                            <span>{t("საჯარო განცხადება", "Public post")}</span>
+                            <span>
+                              {a.createdAt
+                                ? `${t("გამოქვეყნდა", "Published")} ${fmtDate(a.createdAt)}`
+                                : t("საჯარო განცხადება", "Public post")}
+                            </span>
                           </div>
                         </header>
                         {(a.shortDescription || a.description) && (
@@ -706,10 +723,21 @@ function AnnouncementsFeed() {
                           </div>
                         </div>
                         <div className="social-stats">
-                          <span>{a.interestedCount}</span>
+                          <span className="social-like-count">
+                            <ThumbUp size={14} filled />
+                            {a.likeCount ?? 0}
+                          </span>
+                          <span>{a.interestedCount} {t("რეგისტრაცია", "registered")}</span>
                           <span>{a.points > 0 ? `${a.points} ${t("ქულა", "pts")}` : place}</span>
                         </div>
                         <div className="social-actions" onClick={stopCard}>
+                          <button
+                            type="button"
+                            className={a.isLiked ? "liked" : undefined}
+                            onClick={() => { if (isGuest) { askLogin(); return; } void toggleLike(a); }}
+                          >
+                            <ThumbUp size={15} filled={a.isLiked} /> {a.isLiked ? t("მოგწონს", "Liked") : t("ლაიქი", "Like")}
+                          </button>
                           {(isDoctor || isGuest) && (
                             <button type="button" onClick={() => { if (isGuest) { askLogin(); return; } void toggleInterest(a); }} disabled={busyId === a.id}>
                               <Check size={15} /> {going ? t("რეგისტრირებული", "Registered") : t("მონიშვნა", "Interested")}
@@ -803,6 +831,7 @@ function AnnouncementsFeed() {
           onClose={() => setModalId(null)}
           onStop={stopCard}
           onSave={() => { if (isGuest) { askLogin(); return; } void toggleSaved(modalAnnouncement); }}
+          onLike={() => { if (isGuest) { askLogin(); return; } void toggleLike(modalAnnouncement); }}
           onGoing={() => { if (isGuest) { askLogin(); return; } void toggleInterest(modalAnnouncement); }}
           onChat={() => { if (isGuest) { askLogin(); return; } navigate("/chat"); }}
         />
