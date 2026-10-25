@@ -173,61 +173,15 @@ export default function Layout({ children }: { children: ReactNode }) {
     : "#";
 
   const homeTo = isGuest || isAdmin ? "/" : "/announcements";
-  const path = location.pathname;
-  const isCenterList = path === "/centers";
-  const isCenterDetail = path.startsWith("/centers/");
-  const isFeed = path === "/announcements";
-  const isChat = path === "/chat";
-  const isDash = path === "/dashboard" || path === "/my-announcements";
-  const isProfile = path === "/profile" || path === "/certificates";
   const shell: "centers" | "chat" | "feed" | null =
-    isCenterList ? "centers" : isChat ? "chat" : isFeed ? "feed" : null;
-
-  const chatLink: NavItem[] = user ? [{ to: "/chat", label: t("ჩატი", "Chat") }] : [];
-  const centersLink: NavItem = { to: "/centers", label: t("ცენტრები", "Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") };
-  const pageNav: NavItem[] | null = isFeed
-    ? [
-        { to: "/announcements", label: t("ფიდი", "Feed") },
-        centersLink,
-        ...chatLink,
-        ...(isCenter ? [{ to: "/dashboard", label: t("დაფა", "Dashboard") }] : []),
-        ...(!user ? [{ to: "/register", label: t("რეგისტრაცია", "Register") }] : []),
-      ]
-    : isCenterList
-      ? [
-          { to: user ? "/announcements" : "/", label: t("მთავარი", "Home") },
-          { to: "/centers", label: t("ტრენინგ ცენტრები", "Training Centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
-          ...chatLink,
-        ]
-      : isCenterDetail
-        ? [
-            { to: "/centers", label: t("ყველა ცენტრი", "All centers"), full: t("ტრენინგ ცენტრები", "Training Centers") },
-            ...chatLink,
-            ...(user ? [{ to: "/profile", label: t("პროფილი", "Profile") }] : []),
-          ]
-        : isChat
-          ? [
-              { to: user ? "/announcements" : "/", label: t("ფიდი", "Feed") },
-              centersLink,
-              { to: "/chat", label: t("ჩატი", "Chat") },
-            ]
-          : isDash
-            ? [
-                { to: "/announcements", label: t("ტრენინგები", "Trainings") },
-                centersLink,
-                { to: "/dashboard", label: t("დაფა", "Dashboard") },
-                ...chatLink,
-              ]
-            : isProfile && !isAdmin
-              ? [
-                  { to: "/announcements", label: t("ტრენინგები", "Trainings") },
-                  centersLink,
-                  ...chatLink,
-                  { to: "/profile", label: t("პროფილი", "Profile") },
-                  ...(isCenter ? [{ to: "/dashboard", label: t("დაფა", "Dashboard") }] : []),
-                ]
-              : null;
-  const navItems = pageNav ?? nav;
+    location.pathname === "/centers" || location.pathname.startsWith("/centers/")
+      ? "centers"
+      : location.pathname === "/chat"
+        ? "chat"
+        : location.pathname === "/announcements"
+          ? "feed"
+          : null;
+  const navItems = nav;
   const footerLinks = isGuest
     ? [
         { to: "/", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
