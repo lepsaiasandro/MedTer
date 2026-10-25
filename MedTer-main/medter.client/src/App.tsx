@@ -10,6 +10,7 @@ import CenterDetail from "./pages/CenterDetail";
 import AdminDashboard from "./pages/AdminDashboard";
 import Profile from "./pages/Profile";
 import Pricing from "./pages/Pricing";
+import Subscriptions from "./pages/Subscriptions";
 import { type ReactNode } from "react";
 
 function Protected({ children }: { children: ReactNode }) {
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/my-announcements" element={<Navigate to="/announcements" replace />} />
           <Route path="/certificates" element={<Protected><Navigate to="/profile#certificates" replace /></Protected>} />
           <Route path="/profile" element={<Protected><Profile /></Protected>} />
+          <Route path="/subscriptions" element={<Subscriptions />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/admin" element={<Protected><AdminDashboard /></Protected>} />
           <Route path="*" element={<Navigate to={user && !isAdmin ? "/announcements" : "/"} replace />} />

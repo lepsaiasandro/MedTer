@@ -51,9 +51,18 @@ public class ApplicationUser : IdentityUser
     public string? StripeCustomerId { get; set; }
     public string? StripeSubscriptionId { get; set; }
 
-    public bool HasActiveCenterSubscription =>
+    public bool HasActiveSubscription =>
         string.Equals(SubscriptionStatus, "active", StringComparison.OrdinalIgnoreCase)
         && (SubscriptionCurrentPeriodEnd is null || SubscriptionCurrentPeriodEnd > DateTime.UtcNow);
+
+    public bool HasActiveCenterSubscription =>
+        HasActiveSubscription
+        && (string.IsNullOrWhiteSpace(SubscriptionPlanId)
+            || string.Equals(SubscriptionPlanId, "center_pro", StringComparison.OrdinalIgnoreCase));
+
+    public bool HasActiveDoctorSubscription =>
+        HasActiveSubscription
+        && string.Equals(SubscriptionPlanId, "doctor_pro", StringComparison.OrdinalIgnoreCase);
 
     public TrainingCenterProfile? TrainingCenterProfile { get; set; }
     public DoctorProfile? DoctorProfile { get; set; }

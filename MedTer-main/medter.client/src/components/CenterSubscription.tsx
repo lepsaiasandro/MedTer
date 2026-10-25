@@ -68,7 +68,7 @@ export default function CenterSubscription() {
     setBusy(true);
     setError("");
     try {
-      const r = await api.post<{ url: string }>("/billing/checkout");
+      const r = await api.post<{ url: string }>("/billing/checkout", { planId: "center_pro" });
       window.location.href = r.data.url;
     } catch (e: unknown) {
       const msg =
@@ -83,7 +83,7 @@ export default function CenterSubscription() {
     setBusy(true);
     setError("");
     try {
-      const r = await api.post<BillingStatus>("/billing/fake-activate", { days: 30 });
+      const r = await api.post<BillingStatus>("/billing/fake-activate", { days: 30, planId: "center_pro" });
       setStatus(r.data);
       setNote(t("ტესტური გამოწერა გააქტიურდა 30 დღით.", "Test subscription activated for 30 days."));
     } catch (e: unknown) {
@@ -127,7 +127,7 @@ export default function CenterSubscription() {
         marginBottom: 8,
       }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>
-          {t("გამოწერა", "Subscription")} — Center Pro
+          {t("გამოწერა", "Subscription")} — MedTer Pro
         </h3>
         <div style={{ fontSize: 20, fontWeight: 800, color: "var(--brand)" }}>
           {price} ₾

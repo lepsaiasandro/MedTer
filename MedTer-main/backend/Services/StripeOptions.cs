@@ -16,6 +16,9 @@ public class StripeOptions
     /// <summary>Stripe Price ID for Center Pro monthly (price_…).</summary>
     public string CenterProPriceId { get; set; } = string.Empty;
 
+    /// <summary>Stripe Price ID for Doctor Pro monthly (price_…).</summary>
+    public string DoctorProPriceId { get; set; } = string.Empty;
+
     /// <summary>Public site origin for success/cancel URLs, e.g. http://localhost:5173</summary>
     public string PublicAppUrl { get; set; } = "http://localhost:5173";
 
@@ -24,4 +27,7 @@ public class StripeOptions
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(SecretKey) && !string.IsNullOrWhiteSpace(CenterProPriceId);
+
+    public bool IsDoctorConfigured =>
+        !string.IsNullOrWhiteSpace(SecretKey) && !string.IsNullOrWhiteSpace(DoctorProPriceId);
 }

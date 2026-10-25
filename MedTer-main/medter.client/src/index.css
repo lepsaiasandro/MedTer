@@ -3703,3 +3703,53 @@
   flex: none;
 }
 .msg-dock-compose button:disabled { background: var(--surface-2); color: var(--soft); }
+
+.plans-page { max-width: 920px; margin: 0 auto; }
+.plans-head { margin-bottom: 18px; }
+.plans-kicker {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px; border-radius: 999px;
+  background: var(--brand-soft); color: var(--brand);
+  font-size: 12px; font-weight: 750; letter-spacing: 0.02em;
+}
+.plans-head h1 {
+  margin: 10px 0 6px;
+  font-size: clamp(1.6rem, 1.2rem + 1.2vw, 2rem);
+  font-weight: 800; color: var(--text); letter-spacing: -0.4px;
+}
+.plans-head p { margin: 0; max-width: 52ch; color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+.plans-note {
+  margin-bottom: 14px; padding: 10px 12px; border-radius: 10px;
+  background: var(--teal-soft); color: var(--text); font-size: 13.5px;
+}
+.plans-error { margin-bottom: 14px; }
+.plans-status { margin: 0 0 14px; color: var(--teal); font-size: 13.5px; font-weight: 700; }
+.plans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.plan-card {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 20px 18px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.plan-card.is-active { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.plan-icon {
+  width: 42px; height: 42px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--brand-soft); color: var(--brand);
+}
+.plan-brand { font-size: 12px; font-weight: 750; color: var(--brand); }
+.plan-card h2 { margin: 0; font-size: 18px; font-weight: 750; color: var(--text); }
+.plan-price { font-size: 28px; font-weight: 800; color: var(--text); line-height: 1; }
+.plan-price span { font-size: 14px; font-weight: 550; color: var(--muted); }
+.plan-card p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.plan-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.plan-card li { display: flex; align-items: flex-start; gap: 8px; color: var(--text-body); font-size: 13.5px; line-height: 1.4; }
+.plan-card li svg { color: var(--teal); flex: none; margin-top: 2px; }
+.plan-state { color: var(--teal) !important; font-weight: 700; }
+.plan-locked { color: var(--muted) !important; }
+.plan-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.plan-actions .btn { justify-content: center; }
+@media (max-width: 760px) {
+  .plans-grid { grid-template-columns: 1fr; }
+}

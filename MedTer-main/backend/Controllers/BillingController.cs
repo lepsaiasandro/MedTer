@@ -16,7 +16,9 @@ namespace backend.Controllers;
 public class BillingController : ControllerBase
 {
     public const string CenterProPlanId = "center_pro";
+    public const string DoctorProPlanId = "doctor_pro";
     private const decimal CenterProPriceGel = 29m;
+    private const decimal DoctorProPriceGel = 15m;
 
     private readonly UserManager<ApplicationUser> _users;
     private readonly StripeOptions _stripe;
@@ -38,6 +40,10 @@ public class BillingController : ControllerBase
     private string? MyId => User.FindFirstValue(ClaimTypes.NameIdentifier);
     private bool FakeAllowed => _stripe.AllowFakeSubscribe || _env.IsDevelopment();
 
+    [HttpGet("plans")]
+    [AllowAnonymous]
+    public ActionResult<BillingPlansDto> Plans() => Ok(ToPlans());
+
     [HttpGet("status")]
     [Authorize]
     public async Task<ActionResult<BillingStatusDto>> Status()
@@ -51,17 +57,22 @@ public class BillingController : ControllerBase
     /// <summary>Create a Stripe Checkout Session (subscription). Requires Stripe config.</summary>
     [HttpPost("checkout")]
     [Authorize]
-    public async Task<ActionResult<CheckoutSessionDto>> Checkout()
+    public async Task<ActionResult<CheckoutSessionDto>> Checkout([FromBody] CheckoutRequestDto? dto)
     {
         var user = await _users.FindByIdAsync(MyId!);
         if (user is null) return Unauthorized();
-        if (user.Role != UserRole.TrainingCenter)
-            return BadRequest(new { message = "Only training centers can subscribe to Center Pro." });
 
-        if (!_stripe.IsConfigured)
+        var planId = ResolvePlanId(user, dto?.PlanId, out var planError);
+        if (planId is null)
+            return BadRequest(new { message = planError });
+
+        var priceId = PriceIdFor(planId);
+        if (string.IsNullOrWhiteSpace(_stripe.SecretKey) || string.IsNullOrWhiteSpace(priceId))
             return BadRequest(new
             {
-                message = "Stripe is not configured. Set Stripe:SecretKey and Stripe:CenterProPriceId, or use fake-activate in Development."
+                message = planId == DoctorProPlanId
+                    ? "Stripe is not configured. Set Stripe:SecretKey and Stripe:DoctorProPriceId, or use fake-activate in Development."
+                    : "Stripe is not configured. Set Stripe:SecretKey and Stripe:CenterProPriceId, or use fake-activate in Development."
             });
 
         StripeConfiguration.ApiKey = _stripe.SecretKey;
@@ -83,27 +94,27 @@ public class BillingController : ControllerBase
         {
             Mode = "subscription",
             Customer = user.StripeCustomerId,
-            SuccessUrl = $"{baseUrl}/profile?success=1&session_id={{CHECKOUT_SESSION_ID}}",
-            CancelUrl = $"{baseUrl}/profile?canceled=1",
+            SuccessUrl = $"{baseUrl}/subscriptions?success=1&session_id={{CHECKOUT_SESSION_ID}}",
+            CancelUrl = $"{baseUrl}/subscriptions?canceled=1",
             LineItems =
             [
                 new SessionLineItemOptions
                 {
-                    Price = _stripe.CenterProPriceId,
+                    Price = priceId,
                     Quantity = 1
                 }
             ],
             Metadata = new Dictionary<string, string>
             {
                 ["userId"] = user.Id,
-                ["planId"] = CenterProPlanId
+                ["planId"] = planId
             },
             SubscriptionData = new SessionSubscriptionDataOptions
             {
                 Metadata = new Dictionary<string, string>
                 {
                     ["userId"] = user.Id,
-                    ["planId"] = CenterProPlanId
+                    ["planId"] = planId
                 }
             }
         };
@@ -125,12 +136,14 @@ public class BillingController : ControllerBase
 
         var user = await _users.FindByIdAsync(MyId!);
         if (user is null) return Unauthorized();
-        if (user.Role != UserRole.TrainingCenter)
-            return BadRequest(new { message = "Only training centers can subscribe to Center Pro." });
+
+        var planId = ResolvePlanId(user, dto?.PlanId, out var planError);
+        if (planId is null)
+            return BadRequest(new { message = planError });
 
         var days = dto?.Days is > 0 and <= 365 ? dto.Days : 30;
         user.SubscriptionStatus = "active";
-        user.SubscriptionPlanId = CenterProPlanId;
+        user.SubscriptionPlanId = planId;
         user.SubscriptionCurrentPeriodEnd = DateTime.UtcNow.AddDays(days);
         user.StripeSubscriptionId ??= $"fake_sub_{user.Id}";
         await _users.UpdateAsync(user);
@@ -146,8 +159,8 @@ public class BillingController : ControllerBase
     {
         var user = await _users.FindByIdAsync(MyId!);
         if (user is null) return Unauthorized();
-        if (user.Role != UserRole.TrainingCenter)
-            return BadRequest(new { message = "Only training centers have Center Pro." });
+        if (user.Role is not (UserRole.TrainingCenter or UserRole.Doctor))
+            return BadRequest(new { message = "Only doctors and training centers can manage MedTer Pro." });
 
         if (_stripe.IsConfigured
             && !string.IsNullOrWhiteSpace(user.StripeSubscriptionId)
@@ -251,7 +264,9 @@ public class BillingController : ControllerBase
         else
         {
             user.SubscriptionStatus = "active";
-            user.SubscriptionPlanId = CenterProPlanId;
+            user.SubscriptionPlanId = session.Metadata?.GetValueOrDefault("planId") is DoctorProPlanId or CenterProPlanId
+                ? session.Metadata["planId"]
+                : user.Role == UserRole.Doctor ? DoctorProPlanId : CenterProPlanId;
             user.SubscriptionCurrentPeriodEnd = DateTime.UtcNow.AddDays(30);
         }
 
@@ -284,7 +299,10 @@ public class BillingController : ControllerBase
         if (!string.IsNullOrWhiteSpace(sub.CustomerId))
             user.StripeCustomerId = sub.CustomerId;
 
-        user.SubscriptionPlanId = CenterProPlanId;
+        var planId = sub.Metadata?.GetValueOrDefault("planId");
+        user.SubscriptionPlanId = planId is DoctorProPlanId or CenterProPlanId
+            ? planId
+            : user.Role == UserRole.Doctor ? DoctorProPlanId : CenterProPlanId;
         user.SubscriptionStatus = sub.Status switch
         {
             "active" or "trialing" => "active",
@@ -303,15 +321,74 @@ public class BillingController : ControllerBase
             user.SubscriptionCurrentPeriodEnd ??= DateTime.UtcNow.AddDays(30);
     }
 
-    private BillingStatusDto ToStatus(ApplicationUser user) =>
+    private string? ResolvePlanId(ApplicationUser user, string? requested, out string? error)
+    {
+        error = null;
+        var planId = string.IsNullOrWhiteSpace(requested)
+            ? user.Role == UserRole.Doctor ? DoctorProPlanId : CenterProPlanId
+            : requested.Trim();
+
+        if (planId is not (DoctorProPlanId or CenterProPlanId))
+        {
+            error = "Unknown plan.";
+            return null;
+        }
+
+        if (planId == DoctorProPlanId && user.Role != UserRole.Doctor)
+        {
+            error = "Doctor Pro is only for doctors.";
+            return null;
+        }
+
+        if (planId == CenterProPlanId && user.Role != UserRole.TrainingCenter)
+        {
+            error = "Center Pro is only for training centers.";
+            return null;
+        }
+
+        return planId;
+    }
+
+    private string PriceIdFor(string planId) =>
+        planId == DoctorProPlanId ? _stripe.DoctorProPriceId : _stripe.CenterProPriceId;
+
+    private static bool IsActiveFor(ApplicationUser user) => user.Role switch
+    {
+        UserRole.Doctor => user.HasActiveDoctorSubscription,
+        UserRole.TrainingCenter => user.HasActiveCenterSubscription,
+        _ => false
+    };
+
+    private BillingPlansDto ToPlans() =>
         new(
+            [
+                new BillingPlanDto(DoctorProPlanId, "doctor", DoctorProPriceGel, "month", _stripe.IsDoctorConfigured),
+                new BillingPlanDto(CenterProPlanId, "center", CenterProPriceGel, "month", _stripe.IsConfigured)
+            ],
+            FakeAllowed);
+
+    private BillingStatusDto ToStatus(ApplicationUser user)
+    {
+        var active = IsActiveFor(user);
+        var audience = user.Role switch
+        {
+            UserRole.Doctor => "doctor",
+            UserRole.TrainingCenter => "center",
+            _ => "none"
+        };
+        var stripeReady = audience == "doctor" ? _stripe.IsDoctorConfigured : _stripe.IsConfigured;
+        return new(
             user.SubscriptionPlanId ?? "none",
-            user.HasActiveCenterSubscription ? "active" : (user.SubscriptionStatus ?? "none"),
+            active ? "active" : (user.SubscriptionStatus ?? "none"),
             user.SubscriptionCurrentPeriodEnd,
-            user.HasActiveCenterSubscription,
-            _stripe.IsConfigured,
+            active,
+            stripeReady,
             FakeAllowed,
             string.IsNullOrWhiteSpace(_stripe.PublishableKey) ? null : _stripe.PublishableKey,
             CenterProPriceGel,
-            "month");
+            "month",
+            DoctorProPriceGel,
+            "month",
+            audience);
+    }
 }

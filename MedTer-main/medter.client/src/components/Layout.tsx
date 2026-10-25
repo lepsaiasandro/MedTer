@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
 import api from "../api";
-import { Bell, Chat, ChevronDown, Home, Cap, Sun, Moon, Menu, X } from "./icons";
+import { Bell, Chat, Check, ChevronDown, Home, Cap, Sun, Moon, Menu, X } from "./icons";
 import LinearAdBanner from "./LinearAdBanner";
 import GlobalSearch from "./GlobalSearch";
 import ChatDock from "./ChatDock";
@@ -27,16 +27,19 @@ export default function Layout() {
   const nav: NavItem[] = isGuest
     ? [
         { to: "/announcements", label: t("მთავარი", "Home") },
+        { to: "/subscriptions", label: t("გამოწერები", "Subscriptions") },
         { to: "/about", label: t("ჩვენს შესახებ", "About") },
       ]
     : isAdmin
       ? [
           { to: "/", label: t("ადმინი", "Admin"), full: t("ადმინ პანელი", "Admin Panel") },
           { to: "/announcements", label: t("მთავარი", "Home") },
+          { to: "/subscriptions", label: t("გამოწერები", "Subscriptions") },
           { to: "/profile", label: t("პროფილი", "Profile") },
         ]
       : [
           { to: "/announcements", label: t("მთავარი", "Home") },
+          { to: "/subscriptions", label: t("გამოწერები", "Subscriptions") },
           { to: "/profile", label: t("პროფილი", "Profile") },
         ];
 
@@ -171,15 +174,18 @@ export default function Layout() {
   const footerLinks = isGuest
     ? [
         { to: "/announcements", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
+        { to: "/subscriptions", label: t("გამოწერები", "Subscriptions"), icon: <Check size={16} /> },
         { to: "/about", label: t("ჩვენს შესახებ", "About"), icon: <Cap size={16} /> },
       ]
     : isAdmin
       ? [
           { to: "/", label: t("ადმინი", "Admin"), icon: <Home size={16} /> },
+          { to: "/subscriptions", label: t("გამოწერები", "Subscriptions"), icon: <Check size={16} /> },
           { to: "/announcements", label: t("მთავარი", "Home"), icon: <Cap size={16} /> },
         ]
       : [
           { to: "/announcements", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
+          { to: "/subscriptions", label: t("გამოწერები", "Subscriptions"), icon: <Check size={16} /> },
           { to: "/chat", label: t("შეტყობინებები", "Messages"), icon: <Chat size={16} /> },
         ];
   return (
