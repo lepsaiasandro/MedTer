@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import * as signalR from "@microsoft/signalr";
 import api, { API_BASE } from "../api";
@@ -76,6 +77,14 @@ const MAX_RECENT = 8;
 const AVATAR_COLORS = ["#3b82f6", "#f59e0b", "#8b5cf6", "#14b8a6", "#ef4444", "#06b6d4"];
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
+type PickerAnchor = {
+  id: number;
+  top: number;
+  left: number;
+  above: boolean;
+  end: boolean;
+};
+
 function colorFor(id: string) {
   let n = 0;
   for (let i = 0; i < id.length; i++) n = (n + id.charCodeAt(i)) % AVATAR_COLORS.length;
@@ -142,7 +151,7 @@ export default function Chat() {
   const [tab, setTab] = useState<"all" | "unread" | "groups">("all");
   const [creatable, setCreatable] = useState<CreatableAnnouncement[]>([]);
   const [creating, setCreating] = useState(false);
-  const [pickerId, setPickerId] = useState<number | null>(null);
+  const [picker, setPicker] = useState<PickerAnchor | null>(null);
 
   const connectionRef = useRef<signalR.HubConnection | null>(null);
   const activeRef = useRef<ChatGroup | null>(null);
@@ -229,7 +238,7 @@ export default function Chat() {
             : g
         ))
       );
-      setPickerId((id) => (id === evt.messageId ? null : id));
+      setPicker((current) => (current?.id === evt.messageId ? null : current));
     });
 
     connection.start()
@@ -242,7 +251,7 @@ export default function Chat() {
 
   useEffect(() => {
     if (!active) return;
-    setPickerId(null);
+    setPicker(null);
     api.get<GroupMessage[]>(`/chat/groups/${active.id}/messages`).then((r) => setMessages(r.data));
     api.get<GroupMember[]>(`/chat/groups/${active.id}/members`).then((r) => setMembers(r.data));
     connectionRef.current?.invoke("JoinGroup", active.id).catch(() => {});
@@ -255,6 +264,21 @@ export default function Chat() {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [lastMessageId, active?.id]);
+
+  useEffect(() => {
+    if (!picker) return;
+    const close = (e: MouseEvent) => {
+      const el = e.target as HTMLElement;
+      if (!el.closest("[data-react]")) setPicker(null);
+    };
+    const onScroll = () => setPicker(null);
+    document.addEventListener("mousedown", close);
+    listRef.current?.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", close);
+      listRef.current?.removeEventListener("scroll", onScroll);
+    };
+  }, [picker]);
 
   const pushRecent = (id: number) => {
     setRecentIds((prev) => {
@@ -349,7 +373,23 @@ export default function Chat() {
     const conn = hubReady();
     if (!conn) return;
     await conn.invoke("ToggleReaction", active.id, message.id, emoji);
-    setPickerId(null);
+    setPicker(null);
+  };
+
+  const togglePicker = (e: React.MouseEvent<HTMLButtonElement>, id: number, mine: boolean) => {
+    if (picker?.id === id) {
+      setPicker(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const above = rect.top > 56;
+    setPicker({
+      id,
+      top: above ? rect.top - 6 : rect.bottom + 6,
+      left: mine ? rect.right : rect.left,
+      above,
+      end: mine,
+    });
   };
 
   const unsend = async (message: GroupMessage) => {
@@ -359,7 +399,7 @@ export default function Chat() {
     const conn = hubReady();
     if (!conn) return;
     await conn.invoke("UnsendGroupMessage", active.id, message.id);
-    setPickerId(null);
+    setPicker(null);
   };
 
   const meta = (g: ChatGroup) => {
@@ -557,14 +597,7 @@ export default function Chat() {
               </div>
             )}
 
-            <div
-              ref={listRef}
-              className="chat-msgs"
-              onMouseDown={(e) => {
-                const el = e.target as HTMLElement;
-                if (!el.closest("[data-react]")) setPickerId(null);
-              }}
-            >
+            <div ref={listRef} className="chat-msgs">
               {messages.length === 0 && (
                 <p className="contact-empty" style={{ margin: "auto" }}>{t("ჯერ შეტყობინებები არ არის", "No messages yet")}</p>
               )}
@@ -576,26 +609,11 @@ export default function Chat() {
                 const mineEmoji = (emoji: string) =>
                   reactions.some((r) => r.emoji === emoji && r.users.some((u) => u.userId === myId));
                 return (
-                  <div key={m.id} className={`msg-block${pickerId === m.id ? " menu-open" : ""}`}>
+                  <div key={m.id} className={`msg-block${picker?.id === m.id ? " menu-open" : ""}`}>
                     {showDay && <div className="msg-day">{dayLabel(m.sentAt, lang)}</div>}
                     <div className={`msg-row ${mine ? "me" : "them"}`}>
                       {!mine && <span className="cav" style={{ background: colorFor(m.senderId) }}>{initials(m.senderName)}</span>}
                       <div className="msg-col">
-                        {!m.unsent && pickerId === m.id && (
-                          <div className="react-picker" data-react="1">
-                            {REACTION_EMOJIS.map((emoji) => (
-                              <button
-                                key={emoji}
-                                type="button"
-                                className={mineEmoji(emoji) ? "on" : ""}
-                                onClick={() => void reactTo(m, emoji)}
-                                aria-label={emoji}
-                              >
-                                {emoji}
-                              </button>
-                            ))}
-                          </div>
-                        )}
                         <div className={`bubble ${mine ? "me" : "them"}${m.unsent ? " unsent" : ""}`}>
                           {!mine && !m.unsent && <div className="bubble-name">{m.senderName}</div>}
                           <div className="bubble-text">
@@ -614,7 +632,7 @@ export default function Chat() {
                                 className="bubble-act"
                                 data-react="1"
                                 aria-label={t("რეაქცია", "React")}
-                                onClick={() => setPickerId((id) => (id === m.id ? null : m.id))}
+                                onClick={(e) => togglePicker(e, m.id, mine)}
                               >
                                 <Smile size={13} />
                               </button>
@@ -656,6 +674,35 @@ export default function Chat() {
                 );
               })}
             </div>
+            {picker && createPortal(
+              (() => {
+                const message = messages.find((item) => item.id === picker.id);
+                if (!message || message.unsent) return null;
+                const reactions = message.reactions ?? [];
+                const mineEmoji = (emoji: string) =>
+                  reactions.some((r) => r.emoji === emoji && r.users.some((u) => u.userId === myId));
+                return (
+                  <div
+                    className={`react-picker is-pop${picker.above ? " above" : ""}${picker.end ? " end" : ""}`}
+                    data-react="1"
+                    style={{ top: picker.top, left: picker.left }}
+                  >
+                    {REACTION_EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        className={mineEmoji(emoji) ? "on" : ""}
+                        onClick={() => void reactTo(message, emoji)}
+                        aria-label={emoji}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })(),
+              document.body
+            )}
             <form
               onSubmit={send}
               className="composer chat-composer"
