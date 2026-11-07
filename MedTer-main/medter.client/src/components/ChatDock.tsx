@@ -5,6 +5,7 @@ import * as signalR from "@microsoft/signalr";
 import api, { API_BASE } from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
+import EmojiComposer from "./EmojiComposer";
 import { ArrowLeft, ChevronDown, Search, Send, Smile, Trash, Users, X } from "./icons";
 
 interface ChatGroup {
@@ -113,6 +114,7 @@ export default function ChatDock() {
   const connectionRef = useRef<signalR.HubConnection | null>(null);
   const activeRef = useRef<ChatGroup | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLInputElement>(null);
   activeRef.current = active;
   const myId = user?.userId;
 
@@ -404,10 +406,18 @@ export default function ChatDock() {
             </div>
             <form className="msg-dock-compose" onSubmit={send}>
               <input
+                ref={composerRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder={t("შეტყობინება...", "Message...")}
                 aria-label={t("შეტყობინება", "Message")}
+              />
+              <EmojiComposer
+                inputRef={composerRef}
+                value={text}
+                onChange={setText}
+                label={t("სმაილი", "Emoji")}
+                className="msg-dock-emoji"
               />
               <button type="submit" disabled={!text.trim()} aria-label={t("გაგზავნა", "Send")}>
                 <Send size={16} />

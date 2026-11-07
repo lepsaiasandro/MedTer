@@ -3394,6 +3394,34 @@
   resize: none; min-height: 42px; max-height: 120px; border-radius: 14px; padding-top: 10px;
 }
 .chat-send { width: 42px; height: 42px; border-radius: 12px; padding: 0; display: grid; place-items: center; }
+.emoji-board {
+  position: fixed;
+  z-index: 210;
+  width: min(320px, calc(100vw - 16px));
+  max-height: 248px;
+  overflow-y: auto;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+}
+.emoji-board.above { transform: translateY(-100%); }
+.emoji-board button {
+  width: 100%;
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.emoji-board button:hover { background: var(--surface-2); }
 .chat-hints { padding: 0 16px 10px; color: var(--muted); font-size: 11.5px; }
 
 .page:has(> .social-feed) {
@@ -3722,6 +3750,11 @@
   flex: none;
 }
 .msg-dock-compose button:disabled { background: var(--surface-2); color: var(--soft); }
+.msg-dock-compose .msg-dock-emoji {
+  background: transparent;
+  color: var(--text);
+}
+.msg-dock-compose .msg-dock-emoji:hover { background: var(--surface-2); }
 
 .plans-page { max-width: 920px; margin: 0 auto; }
 .plans-head { margin-bottom: 18px; }

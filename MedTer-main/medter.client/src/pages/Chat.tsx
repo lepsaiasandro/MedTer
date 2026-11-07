@@ -5,6 +5,7 @@ import * as signalR from "@microsoft/signalr";
 import api, { API_BASE } from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
+import EmojiComposer from "../components/EmojiComposer";
 import { ArrowLeft, Paperclip, Plus, Search, Send, Smile, Trash, Users, X } from "../components/icons";
 import { matchesSearch } from "../lib/search";
 
@@ -157,6 +158,7 @@ export default function Chat() {
   const activeRef = useRef<ChatGroup | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   activeRef.current = active;
   const myId = user?.userId;
@@ -712,6 +714,7 @@ export default function Chat() {
                 <Paperclip size={18} />
               </button>
               <textarea
+                ref={composerRef}
                 className="control"
                 rows={1}
                 value={text}
@@ -724,9 +727,13 @@ export default function Chat() {
                 }}
                 placeholder={t("დაწერე შეტყობინება...", "Type a message...")}
               />
-              <button type="button" className="icon-btn" aria-label={t("სმაილი", "Emoji")} onClick={() => setText((v) => `${v}😊`)}>
-                <Smile size={18} />
-              </button>
+              <EmojiComposer
+                inputRef={composerRef}
+                value={text}
+                onChange={setText}
+                label={t("სმაილი", "Emoji")}
+                className="icon-btn"
+              />
               <button className="btn btn-primary chat-send" aria-label={t("გაგზავნა", "Send")}><Send size={18} /></button>
             </form>
             <div className="chat-hints">
