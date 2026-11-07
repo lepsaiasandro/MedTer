@@ -5,7 +5,6 @@ import { usePrefs } from "../i18n";
 import api from "../api";
 import { Bell, Chat, ChevronDown, Home, Cap, Sun, Moon, Menu, X } from "./icons";
 import LinearAdBanner from "./LinearAdBanner";
-import GlobalSearch from "./GlobalSearch";
 import ChatDock from "./ChatDock";
 import logoIcon from "../assets/medter-icon.png";
 
@@ -231,8 +230,6 @@ export default function Layout() {
               );
             })}
           </nav>
-
-          {(!shell || shell === "feed") && <GlobalSearch />}
 
           <div className="top-actions">
             {(!shell || shell === "feed") && (
