@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import * as signalR from "@microsoft/signalr";
 import api, { API_BASE } from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import { ArrowLeft, ChevronDown, Search, Send, X } from "./icons";
+import { ArrowLeft, ChevronDown, Search, Send, Smile, Trash, Users, X } from "./icons";
 
 interface ChatGroup {
   id: number;
@@ -17,6 +18,17 @@ interface ChatGroup {
   lastMessageUnsent?: boolean;
 }
 
+interface ReactionUser {
+  userId: string;
+  displayName: string;
+}
+
+interface MessageReaction {
+  emoji: string;
+  count: number;
+  users: ReactionUser[];
+}
+
 interface GroupMessage {
   id: number;
   groupId: number;
@@ -25,9 +37,40 @@ interface GroupMessage {
   text: string;
   sentAt: string;
   unsent?: boolean;
+  reactions?: MessageReaction[];
 }
 
+interface GroupMember {
+  userId: string;
+  displayName: string;
+  role: string;
+  city?: string;
+}
+
+interface UnsentEvent {
+  messageId: number;
+  groupId: number;
+  lastMessagePreview?: string | null;
+  lastMessageAt?: string | null;
+  lastMessageUnsent: boolean;
+}
+
+interface ReactionsEvent {
+  messageId: number;
+  groupId: number;
+  reactions: MessageReaction[];
+}
+
+type PickerAnchor = {
+  id: number;
+  top: number;
+  left: number;
+  above: boolean;
+  end: boolean;
+};
+
 const AVATAR_COLORS = ["#3b82f6", "#f59e0b", "#8b5cf6", "#14b8a6", "#ef4444", "#06b6d4"];
+const REACTION_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 function colorFor(id: string) {
   let n = 0;
@@ -61,8 +104,11 @@ export default function ChatDock() {
   const [groups, setGroups] = useState<ChatGroup[]>([]);
   const [active, setActive] = useState<ChatGroup | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
+  const [members, setMembers] = useState<GroupMember[]>([]);
+  const [showMembers, setShowMembers] = useState(false);
   const [text, setText] = useState("");
   const [query, setQuery] = useState("");
+  const [picker, setPicker] = useState<PickerAnchor | null>(null);
 
   const connectionRef = useRef<signalR.HubConnection | null>(null);
   const activeRef = useRef<ChatGroup | null>(null);
@@ -108,6 +154,34 @@ export default function ChatDock() {
       );
     });
 
+    connection.on("MessageReactionsUpdated", (evt: ReactionsEvent) => {
+      const current = activeRef.current;
+      if (!current || evt.groupId !== current.id) return;
+      setMessages((prev) => prev.map((m) => (m.id === evt.messageId ? { ...m, reactions: evt.reactions } : m)));
+    });
+
+    connection.on("GroupMessageUnsent", (evt: UnsentEvent) => {
+      const current = activeRef.current;
+      if (current && evt.groupId === current.id) {
+        setMessages((prev) => prev.map((m) => (
+          m.id === evt.messageId ? { ...m, text: "", unsent: true, reactions: [] } : m
+        )));
+      }
+      setGroups((prev) =>
+        sortByRecent(prev.map((g) =>
+          g.id === evt.groupId
+            ? {
+                ...g,
+                lastMessageAt: evt.lastMessageAt,
+                lastMessagePreview: evt.lastMessagePreview,
+                lastMessageUnsent: evt.lastMessageUnsent,
+              }
+            : g
+        ))
+      );
+      setPicker((currentPicker) => (currentPicker?.id === evt.messageId ? null : currentPicker));
+    });
+
     connection.start()
       .then(() => loadGroups().catch(() => {}))
       .catch(() => {});
@@ -118,7 +192,10 @@ export default function ChatDock() {
 
   useEffect(() => {
     if (!active) return;
+    setPicker(null);
+    setShowMembers(false);
     api.get<GroupMessage[]>(`/chat/groups/${active.id}/messages`).then((r) => setMessages(r.data)).catch(() => {});
+    api.get<GroupMember[]>(`/chat/groups/${active.id}/members`).then((r) => setMembers(r.data)).catch(() => {});
     api.post(`/chat/groups/${active.id}/read`).catch(() => {});
     connectionRef.current?.invoke("JoinGroup", active.id).catch(() => {});
     setGroups((prev) => prev.map((g) => (g.id === active.id ? { ...g, unreadCount: 0 } : g)));
@@ -129,6 +206,21 @@ export default function ChatDock() {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [lastId, active?.id, open]);
+
+  useEffect(() => {
+    if (!picker) return;
+    const close = (e: MouseEvent) => {
+      const el = e.target as HTMLElement;
+      if (!el.closest("[data-react]")) setPicker(null);
+    };
+    const onScroll = () => setPicker(null);
+    document.addEventListener("mousedown", close);
+    listRef.current?.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", close);
+      listRef.current?.removeEventListener("scroll", onScroll);
+    };
+  }, [picker]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -150,7 +242,48 @@ export default function ChatDock() {
     await conn.invoke("SendGroupMessage", active.id, body);
   };
 
+  const hubReady = () => {
+    const conn = connectionRef.current;
+    return conn && conn.state === signalR.HubConnectionState.Connected ? conn : null;
+  };
+
+  const reactTo = async (message: GroupMessage, emoji: string) => {
+    if (!active || message.unsent) return;
+    const conn = hubReady();
+    if (!conn) return;
+    await conn.invoke("ToggleReaction", active.id, message.id, emoji);
+    setPicker(null);
+  };
+
+  const unsend = async (message: GroupMessage) => {
+    if (!active || message.unsent || message.senderId !== myId) return;
+    const ok = window.confirm(t("გავაუქმოთ ეს შეტყობინება ყველასთვის?", "Unsend this message for everyone?"));
+    if (!ok) return;
+    const conn = hubReady();
+    if (!conn) return;
+    await conn.invoke("UnsendGroupMessage", active.id, message.id);
+    setPicker(null);
+  };
+
+  const togglePicker = (e: React.MouseEvent<HTMLButtonElement>, id: number, mine: boolean) => {
+    if (picker?.id === id) {
+      setPicker(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const above = rect.top > 56;
+    setPicker({
+      id,
+      top: above ? rect.top - 6 : rect.bottom + 6,
+      left: mine ? rect.right : rect.left,
+      above,
+      end: mine,
+    });
+  };
+
   if (!user || location.pathname === "/chat") return null;
+
+  const picked = picker ? messages.find((item) => item.id === picker.id) : null;
 
   return (
     <aside className={`msg-dock${open ? " open" : ""}`} aria-label={t("შეტყობინებები", "Messages")}>
@@ -174,7 +307,7 @@ export default function ChatDock() {
         active ? (
           <div className="msg-dock-thread">
             <div className="msg-dock-thread-head">
-              <button type="button" className="msg-dock-icon" aria-label={t("უკან", "Back")} onClick={() => { setActive(null); setText(""); }}>
+              <button type="button" className="msg-dock-icon" aria-label={t("უკან", "Back")} onClick={() => { setActive(null); setText(""); setShowMembers(false); setPicker(null); }}>
                 <ArrowLeft size={18} />
               </button>
               <span className="msg-dock-av" style={{ background: colorFor(String(active.id)) }}>{initials(active.name)}</span>
@@ -182,19 +315,88 @@ export default function ChatDock() {
                 <b>{active.name}</b>
                 <span>{active.memberCount} {t("წევრი", "members")}</span>
               </div>
+              <button
+                type="button"
+                className={`msg-dock-icon${showMembers ? " on" : ""}`}
+                aria-label={t("წევრები", "Members")}
+                aria-expanded={showMembers}
+                onClick={() => setShowMembers((v) => !v)}
+              >
+                <Users size={16} />
+              </button>
             </div>
+            {showMembers && (
+              <div className="group-members">
+                {members.map((m) => (
+                  <div key={m.userId} className="group-member">
+                    <span className="cav" style={{ width: 28, height: 28, fontSize: 12, background: colorFor(m.userId) }}>{m.displayName.charAt(0)}</span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="cname" style={{ fontSize: 13 }}>{m.displayName}{m.userId === myId ? ` (${t("შენ", "you")})` : ""}</div>
+                      <div className="crole">
+                        {m.role === "Doctor" ? t("ექიმი", "Doctor") : t("ტრენინგ ცენტრი", "Training Center")}
+                        {m.city ? ` · ${m.city}` : ""}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="msg-dock-msgs" ref={listRef}>
               {messages.map((m) => {
                 const mine = m.senderId === myId;
+                const reactions = m.reactions ?? [];
+                const mineEmoji = (emoji: string) =>
+                  reactions.some((r) => r.emoji === emoji && r.users.some((u) => u.userId === myId));
                 return (
                   <div key={m.id} className={`msg-dock-row${mine ? " mine" : ""}`}>
                     {!mine && <span className="msg-dock-av sm" style={{ background: colorFor(m.senderId) }}>{initials(m.senderName)}</span>}
-                    <div>
+                    <div className="msg-dock-bubble">
                       {!mine && !m.unsent && <span className="msg-dock-sender">{m.senderName}</span>}
                       <p className={m.unsent ? "unsent" : ""}>
                         {m.unsent ? t("შეტყობინება გაუქმდა", "Message unsent") : m.text}
                       </p>
-                      <time>{clock(m.sentAt)}</time>
+                      <div className="msg-dock-meta">
+                        <time>{clock(m.sentAt)}</time>
+                        {!m.unsent && (
+                          <button
+                            type="button"
+                            className="bubble-act"
+                            data-react="1"
+                            aria-label={t("რეაქცია", "React")}
+                            onClick={(e) => togglePicker(e, m.id, mine)}
+                          >
+                            <Smile size={13} />
+                          </button>
+                        )}
+                        {mine && !m.unsent && (
+                          <button
+                            type="button"
+                            className="bubble-act"
+                            data-react="1"
+                            aria-label={t("გაუქმება", "Unsend")}
+                            title={t("გაუქმება ყველასთვის", "Unsend for everyone")}
+                            onClick={() => void unsend(m)}
+                          >
+                            <Trash size={13} />
+                          </button>
+                        )}
+                      </div>
+                      {reactions.length > 0 && !m.unsent && (
+                        <div className="msg-reacts">
+                          {reactions.map((r) => (
+                            <button
+                              key={r.emoji}
+                              type="button"
+                              className={`msg-react${mineEmoji(r.emoji) ? " mine" : ""}`}
+                              title={r.users.map((u) => u.displayName).filter(Boolean).join(", ")}
+                              onClick={() => void reactTo(m, r.emoji)}
+                            >
+                              <span>{r.emoji}</span>
+                              <span>{r.count}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -259,6 +461,30 @@ export default function ChatDock() {
             </div>
           </div>
         )
+      )}
+      {picked && !picked.unsent && picker && createPortal(
+        <div
+          className={`react-picker is-pop${picker.above ? " above" : ""}${picker.end ? " end" : ""}`}
+          data-react="1"
+          style={{ top: picker.top, left: picker.left }}
+        >
+          {REACTION_EMOJIS.map((emoji) => {
+            const reactions = picked.reactions ?? [];
+            const on = reactions.some((r) => r.emoji === emoji && r.users.some((u) => u.userId === myId));
+            return (
+              <button
+                key={emoji}
+                type="button"
+                className={on ? "on" : ""}
+                onClick={() => void reactTo(picked, emoji)}
+                aria-label={emoji}
+              >
+                {emoji}
+              </button>
+            );
+          })}
+        </div>,
+        document.body
       )}
     </aside>
   );
