@@ -6,6 +6,7 @@ import Register from "./pages/Register";
 import About from "./pages/About";
 import Chat from "./pages/Chat";
 import Announcements from "./pages/Announcements";
+import Dashboard from "./pages/Dashboard";
 import CenterDetail from "./pages/CenterDetail";
 import AdminDashboard from "./pages/AdminDashboard";
 import Profile from "./pages/Profile";
@@ -40,7 +41,7 @@ export default function App() {
             element={isAdmin ? <AdminDashboard /> : <Announcements />}
           />
           <Route path="/about" element={<About />} />
-          <Route path="/centers" element={<ToFeed />} />
+          <Route path="/centers" element={<Dashboard />} />
           <Route path="/centers/:userId" element={<CenterDetail />} />
           <Route path="/chat" element={<Protected><Chat /></Protected>} />
           <Route path="/announcements" element={isAdmin ? <Announcements /> : <ToFeed />} />

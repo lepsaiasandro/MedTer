@@ -188,7 +188,7 @@ export default function Dashboard() {
   return (
     <div className="dir">
       <div className="dir-crumb">
-        <Link to="/announcements">{t("მთავარი", "Home")}</Link>
+        <Link to="/">{t("მთავარი", "Home")}</Link>
         <span>/</span>
         <span>{t("ტრენინგ ცენტრები", "Training Centers")}</span>
       </div>
