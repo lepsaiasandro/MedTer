@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { usePrefs } from "../i18n";
 
@@ -14,16 +13,16 @@ const CATEGORIES = [
   "რადიოლოგია",
 ];
 
-type FieldKey = "title" | "category" | "startDate" | "points" | "city" | "meetingAccess";
+type FieldKey = "title" | "category" | "startDate" | "points" | "seats" | "city" | "meetingAccess";
 
 export default function AddTrainingModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const { t } = usePrefs();
-  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [format, setFormat] = useState("ონლაინ");
   const [startDate, setStartDate] = useState("");
   const [points, setPoints] = useState("");
+  const [seats, setSeats] = useState("");
   const [city, setCity] = useState("");
   const [meetingAccess, setMeetingAccess] = useState("");
   const [shortDescription, setShortDescription] = useState("");
@@ -38,6 +37,10 @@ export default function AddTrainingModal({ onClose, onSaved }: { onClose: () => 
       if (!startDate) next.startDate = t("მიუთითე თარიღი და დრო", "Set the date and time");
       if (points.trim() === "" || Number.isNaN(Number(points)) || Number(points) < 0) {
         next.points = t("მიუთითე უპგ ქულა", "Enter CPD points");
+      }
+      const seatCount = Number(seats);
+      if (seats.trim() === "" || !Number.isInteger(seatCount) || seatCount < 1) {
+        next.seats = t("მიუთითე ადგილების რაოდენობა", "Enter the number of seats");
       }
       if (format !== "ონლაინ" && !city.trim()) next.city = t("ქალაქი სავალდებულოა", "City is required");
       if (format !== "დასწრებით") {
@@ -61,6 +64,7 @@ export default function AddTrainingModal({ onClose, onSaved }: { onClose: () => 
         city: city.trim() || null,
         meetingAccess: meetingAccess.trim() || null,
         points: Number(points) || 0,
+        seats: seats.trim() === "" ? null : Number(seats),
         price: 0,
         startDate: start && !isNaN(start.getTime()) ? start.toISOString() : null,
         status,
@@ -68,16 +72,7 @@ export default function AddTrainingModal({ onClose, onSaved }: { onClose: () => 
       onSaved();
       onClose();
     } catch (e: unknown) {
-      const data = (e as { response?: { status?: number; data?: { message?: string; code?: string } } })?.response;
-      if (data?.status === 402 || data?.data?.code === "subscription_required") {
-        const go = confirm(
-          (data.data?.message || t("გამოქვეყნებისთვის საჭიროა Center Pro.", "Center Pro is required to publish."))
-          + "\n\n"
-          + t("გახსნა პროფილის გამოწერა?", "Open subscription in profile?")
-        );
-        if (go) navigate("/profile#subscription");
-        return;
-      }
+      const data = (e as { response?: { data?: { message?: string } } })?.response;
       alert(data?.data?.message || t("შენახვა ვერ მოხერხდა", "Save failed"));
     } finally {
       setSaving(null);
@@ -144,6 +139,13 @@ export default function AddTrainingModal({ onClose, onSaved }: { onClose: () => 
               placeholder="20" style={errors.points ? { borderColor: "var(--danger)" } : undefined} />
             {err("points")}
           </div>
+        </div>
+
+        <div className="field">
+          <label>{t("ადგილების რაოდენობა", "Number of seats")} <span className="req">*</span></label>
+          <input className="control" type="number" min={1} step={1} value={seats} onChange={(e) => setSeats(e.target.value)}
+            placeholder="30" style={errors.seats ? { borderColor: "var(--danger)" } : undefined} />
+          {err("seats")}
         </div>
 
         {format !== "ონლაინ" && (

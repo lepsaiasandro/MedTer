@@ -3,7 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
 import api from "../api";
-import { Bell, Chat, Check, ChevronDown, Home, Cap, Sun, Moon, Menu, X } from "./icons";
+import { Bell, Chat, ChevronDown, Home, Cap, Sun, Moon, Menu, X } from "./icons";
 import LinearAdBanner from "./LinearAdBanner";
 import GlobalSearch from "./GlobalSearch";
 import ChatDock from "./ChatDock";
@@ -26,20 +26,17 @@ export default function Layout() {
   type NavItem = { to: string; label: string; full?: string };
   const nav: NavItem[] = isGuest
     ? [
-        { to: "/announcements", label: t("მთავარი", "Home") },
-        { to: "/subscriptions", label: t("გამოწერები", "Subscriptions") },
+        { to: "/", label: t("მთავარი", "Home") },
         { to: "/about", label: t("ჩვენს შესახებ", "About") },
       ]
     : isAdmin
       ? [
           { to: "/", label: t("ადმინი", "Admin"), full: t("ადმინ პანელი", "Admin Panel") },
           { to: "/announcements", label: t("მთავარი", "Home") },
-          { to: "/subscriptions", label: t("გამოწერები", "Subscriptions") },
           { to: "/profile", label: t("პროფილი", "Profile") },
         ]
       : [
-          { to: "/announcements", label: t("მთავარი", "Home") },
-          { to: "/subscriptions", label: t("გამოწერები", "Subscriptions") },
+          { to: "/", label: t("მთავარი", "Home") },
           { to: "/profile", label: t("პროფილი", "Profile") },
         ];
 
@@ -133,7 +130,7 @@ export default function Layout() {
       setLoginOpen(false);
       setEmail("");
       setPassword("");
-      navigate(data.role === "Admin" ? "/" : "/announcements");
+      navigate("/");
     } catch (err: any) {
       const http = err?.response?.status;
       const body = err?.response?.data;
@@ -168,24 +165,21 @@ export default function Layout() {
       )}`
     : "#";
 
-  const homeTo = isAdmin ? "/" : "/announcements";
+  const homeTo = "/";
   const shell = null;
   const navItems = nav;
   const footerLinks = isGuest
     ? [
-        { to: "/announcements", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
-        { to: "/subscriptions", label: t("გამოწერები", "Subscriptions"), icon: <Check size={16} /> },
+        { to: "/", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
         { to: "/about", label: t("ჩვენს შესახებ", "About"), icon: <Cap size={16} /> },
       ]
     : isAdmin
       ? [
           { to: "/", label: t("ადმინი", "Admin"), icon: <Home size={16} /> },
-          { to: "/subscriptions", label: t("გამოწერები", "Subscriptions"), icon: <Check size={16} /> },
           { to: "/announcements", label: t("მთავარი", "Home"), icon: <Cap size={16} /> },
         ]
       : [
-          { to: "/announcements", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
-          { to: "/subscriptions", label: t("გამოწერები", "Subscriptions"), icon: <Check size={16} /> },
+          { to: "/", label: t("მთავარი", "Home"), icon: <Home size={16} /> },
           { to: "/chat", label: t("შეტყობინებები", "Messages"), icon: <Chat size={16} /> },
         ];
   return (
@@ -210,13 +204,16 @@ export default function Layout() {
           <nav className="nav" aria-label={t("ძირითადი ნავიგაცია", "Main navigation")}>
             {navItems.map((item) => {
               const hash = item.to.includes("#") ? item.to.split("#")[1] : "";
+              const onFeed = location.pathname === "/" || location.pathname === "/announcements";
               const active = item.to === "/centers"
                 ? location.pathname === "/centers" || location.pathname.startsWith("/centers/")
                 : item.to === "/announcements"
                   ? location.pathname === "/announcements"
-                  : hash
-                    ? location.pathname === "/" && location.hash === `#${hash}`
-                    : location.pathname === item.to && !location.hash;
+                  : item.to === "/" && !isAdmin
+                    ? onFeed && !location.hash
+                    : hash
+                      ? location.pathname === "/" && location.hash === `#${hash}`
+                      : location.pathname === item.to && !location.hash;
               return (
                 <Link
                   key={`${item.to}-${item.label}`}
@@ -390,13 +387,16 @@ export default function Layout() {
         </div>
         {navItems.map((item) => {
           const hash = item.to.includes("#") ? item.to.split("#")[1] : "";
+          const onFeed = location.pathname === "/" || location.pathname === "/announcements";
           const active = item.to === "/centers"
             ? location.pathname === "/centers" || location.pathname.startsWith("/centers/")
             : item.to === "/announcements"
               ? location.pathname === "/announcements"
-              : hash
-                ? location.pathname === "/" && location.hash === `#${hash}`
-                : location.pathname === item.to && !location.hash;
+              : item.to === "/" && !isAdmin
+                ? onFeed && !location.hash
+                : hash
+                  ? location.pathname === "/" && location.hash === `#${hash}`
+                  : location.pathname === item.to && !location.hash;
           return (
             <Link
               key={`${item.to}-${item.label}`}

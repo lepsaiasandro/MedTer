@@ -178,9 +178,6 @@ public class AnnouncementsController : ControllerBase
     {
         if (!IsCenter) return Forbid();
 
-        var subBlock = await RequireCenterProForPublishAsync(dto.Status);
-        if (subBlock is not null) return subBlock;
-
         var a = new Announcement { CenterUserId = MyId };
         await ApplyAsync(a, dto);
         _db.Announcements.Add(a);
@@ -195,30 +192,9 @@ public class AnnouncementsController : ControllerBase
         if (a is null) return NotFound();
         if (a.CenterUserId != MyId) return Forbid();
 
-        var subBlock = await RequireCenterProForPublishAsync(dto.Status);
-        if (subBlock is not null) return subBlock;
-
         await ApplyAsync(a, dto);
         await _db.SaveChangesAsync();
         return Ok();
-    }
-
-    /// <summary>Drafts are free; publishing (Pending/Published) requires active Center Pro.</summary>
-    private async Task<IActionResult?> RequireCenterProForPublishAsync(string? requestedStatus)
-    {
-        if (string.Equals(requestedStatus, "Draft", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        var center = await _db.Users.FindAsync(MyId);
-        if (center is null) return Unauthorized();
-        if (center.HasActiveCenterSubscription) return null;
-
-        return StatusCode(StatusCodes.Status402PaymentRequired, new
-        {
-            message = "Center Pro subscription required to publish trainings. You can still save drafts.",
-            code = "subscription_required",
-            pricingPath = "/profile#subscription"
-        });
     }
 
     // Copy incoming fields onto the entity (shared by Create + Update)

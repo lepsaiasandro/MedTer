@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import api from "../api";
+import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
 import { partnerLogoUrl } from "../partnerLogos";
 
@@ -211,11 +212,12 @@ export default function LinearAdBanner({
   compact?: boolean;
 }) {
   const { t } = usePrefs();
+  const { user } = useAuth();
   const { pathname } = useLocation();
   const [items, setItems] = useState<PartnerCreative[]>(() => buildPool([], placement, random));
   const [index, setIndex] = useState(() => (random && items.length ? Math.floor(Math.random() * items.length) : 0));
 
-  const pageHasOwnBanner = pathname === "/announcements" || pathname === "/centers";
+  const pageHasOwnBanner = pathname === "/announcements" || pathname === "/centers" || (pathname === "/" && user?.role !== "Admin");
   const hideInLayout = !embedded && pageHasOwnBanner;
 
   useEffect(() => {

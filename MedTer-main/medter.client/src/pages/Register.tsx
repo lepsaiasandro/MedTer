@@ -151,7 +151,7 @@ export default function Register() {
           profilePhotoUrl: data.profilePhotoUrl ?? data.ProfilePhotoUrl,
         });
         navigate(
-          "/announcements?welcome=1",
+          "/?welcome=1",
           { replace: true }
         );
         return;

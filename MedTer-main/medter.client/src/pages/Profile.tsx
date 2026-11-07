@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import api from "../api";
 import { useAuth } from "../auth";
 import { usePrefs } from "../i18n";
-import CenterSubscription from "../components/CenterSubscription";
 import { Calendar, Cap, Check, Doc, Mail, Pin, Trophy, Users } from "../components/icons";
 
 type ProfileSection =
@@ -11,8 +10,6 @@ type ProfileSection =
   | "progress"
   | "certificates"
   | "overview"
-  | "subscription"
-  | "payment"
   | "account"
   | "admin";
 
@@ -144,8 +141,6 @@ export default function Profile() {
     if (center) {
       items.push(
         { id: "overview", label: t("მიმოხილვა", "Overview"), icon: <Cap size={17} /> },
-        { id: "subscription", label: t("გამოწერა", "Subscription"), icon: <Check size={17} /> },
-        { id: "payment", label: t("გადახდის მეთოდები", "Payment methods"), icon: <Doc size={17} sw={2} /> },
       );
     }
     if (admin) {
@@ -320,7 +315,7 @@ export default function Profile() {
       <div className="page-head">
         <div className="h-text">
           <h1>{t("ჩემი პროფილი", "My Profile")}</h1>
-          <p>{t("პირადი ინფორმაცია, გამოწერა და ანგარიშის პარამეტრები", "Personal info, subscription and account settings")}</p>
+          <p>{t("პირადი ინფორმაცია და ანგარიშის პარამეტრები", "Personal info and account settings")}</p>
         </div>
         {canEdit && !editing && section === "info" && (
           <button className="btn btn-primary" type="button" onClick={startEdit}>
@@ -566,7 +561,7 @@ export default function Profile() {
                 </p>
                 {profile.interestsCount > 0 && (
                   <Link
-                    to="/announcements?mine=1"
+                    to="/?mine=1"
                     style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border)", fontSize: 13.5, color: "var(--muted)", display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}
                   >
                     <Users size={16} /> {t("ჩემი ტრენინგები", "My trainings")}: <b style={{ color: "var(--text)" }}>{profile.interestsCount}</b>
@@ -626,7 +621,7 @@ export default function Profile() {
               <div className="card" style={{ padding: 20 }}>
                 <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 10 }}>{t("სწრაფი ბმულები", "Quick links")}</h3>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                    <Link to="/announcements" className="btn btn-primary btn-sm">{t("ტრენინგები", "Trainings")}</Link>
+                    <Link to="/" className="btn btn-primary btn-sm">{t("ტრენინგები", "Trainings")}</Link>
                     <Link to="/chat" className="btn btn-ghost btn-sm">{t("შეტყობინებები", "Messages")}</Link>
                   </div>
                   {profile.ratingCount > 0 && (
@@ -635,38 +630,6 @@ export default function Profile() {
                     </p>
                   )}
               </div>
-            </div>
-          )}
-
-          {section === "subscription" && isCenter && (
-            <CenterSubscription />
-          )}
-
-          {section === "payment" && isCenter && (
-            <div id="payment" className="card" style={{ padding: 20 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: "0 0 8px" }}>
-                {t("გადახდის მეთოდები", "Payment methods")}
-              </h3>
-              <p style={{ fontSize: 13.5, color: "var(--muted)", margin: "0 0 16px", lineHeight: 1.55 }}>
-                {t(
-                  "ბარათები და გადახდები მუშავდება Stripe-ის მეშვეობით. ახალი ბარათის დამატება ან არსებულის განახლება ხდება Checkout-ის დროს.",
-                  "Cards and payments are handled via Stripe. Add or update a card during Checkout."
-                )}
-              </p>
-              <ul style={{
-                margin: "0 0 18px",
-                paddingLeft: 18,
-                color: "var(--text-body)",
-                lineHeight: 1.65,
-                fontSize: 13.5,
-              }}>
-                <li>{t("უსაფრთხო გადახდა Stripe Checkout-ით", "Secure payment via Stripe Checkout")}</li>
-                <li>{t("ბარათის მონაცემები MedTer-ზე არ ინახება", "Card details are not stored on MedTer")}</li>
-                <li>{t("გამოწერის მართვა — გამოწერის სექციიდან", "Manage subscription from the Subscription section")}</li>
-              </ul>
-              <button className="btn btn-primary btn-sm" type="button" onClick={() => goSection("subscription")}>
-                {t("გამოწერაზე გადასვლა", "Go to subscription")}
-              </button>
             </div>
           )}
 

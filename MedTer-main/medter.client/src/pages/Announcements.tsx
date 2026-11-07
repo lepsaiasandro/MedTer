@@ -465,7 +465,7 @@ function AnnouncementsFeed() {
     <div className="social-feed">
       <aside className="social-nav">
         <button type="button" className={!mineTab && !savedOnly ? "on" : ""} onClick={() => { setTab(false); setSavedOnlyQ(false); }}>
-          <Home size={16} /> {t("ფიდი", "Feed")}
+          <Home size={16} /> {t("მთავარი", "Home")}
         </button>
         <Link to="/centers"><Users size={16} /> {t("ცენტრები", "Centers")}</Link>
         <button type="button" className={mineTab ? "on" : ""} onClick={() => { if (isGuest) { askLogin(); return; } setSavedOnlyQ(false); setTab(true); }}>
