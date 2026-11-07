@@ -23,6 +23,7 @@ jobs:
         with:
           dotnet-version: '10.x'
 
+<<<<<<< HEAD
       # SPA is built during `dotnet publish` (see backend.csproj BuildClientApp)
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -36,6 +37,13 @@ jobs:
 
       - name: dotnet publish
         run: dotnet publish MedTer-main/backend/backend.csproj -c Release -o ${{env.DOTNET_ROOT}}/myapp
+=======
+      - name: Build with dotnet
+        run: dotnet build --configuration Release
+
+      - name: dotnet publish
+        run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
+>>>>>>> ff5449624c1f8af6dc135bf9e78f117d3517852f
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -55,7 +63,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: .net-app
+<<<<<<< HEAD
 
+=======
+      
+>>>>>>> ff5449624c1f8af6dc135bf9e78f117d3517852f
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -70,3 +82,7 @@ jobs:
           app-name: 'medtermain'
           slot-name: 'Production'
           package: .
+<<<<<<< HEAD
+=======
+          
+>>>>>>> ff5449624c1f8af6dc135bf9e78f117d3517852f
