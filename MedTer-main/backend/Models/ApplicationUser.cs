@@ -41,6 +41,15 @@ public class ApplicationUser : IdentityUser
     /// <summary>Set when status is Rejected or Suspended.</summary>
     public string? RejectionReason { get; set; }
 
+    /// <summary>SHA-256 of "{userId}:{code}". Cleared after a successful check.</summary>
+    public string? EmailVerificationCodeHash { get; set; }
+
+    public DateTime? EmailVerificationCodeExpiresUtc { get; set; }
+
+    public DateTime? EmailVerificationSentUtc { get; set; }
+
+    public int EmailVerificationAttempts { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // ── Center Pro subscription (Stripe test / fake activate) ──────────────

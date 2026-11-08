@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using backend.Data;
 using backend.Dtos;
 using backend.Models;
@@ -12,21 +14,31 @@ namespace backend.Controllers;
 [Route("api/auth")]
 public class AuthController : ControllerBase
 {
+    private const int CodeLifetimeMinutes = 15;
+    private const int ResendCooldownSeconds = 60;
+    private const int MaxCodeAttempts = 5;
+
     private readonly UserManager<ApplicationUser> _users;
     private readonly TokenService _tokens;
     private readonly IConfiguration _config;
     private readonly AppDbContext _db;
+    private readonly IEmailSender _email;
+    private readonly IHostEnvironment _env;
 
     public AuthController(
         UserManager<ApplicationUser> users,
         TokenService tokens,
         IConfiguration config,
-        AppDbContext db)
+        AppDbContext db,
+        IEmailSender email,
+        IHostEnvironment env)
     {
         _users = users;
         _tokens = tokens;
         _config = config;
         _db = db;
+        _email = email;
+        _env = env;
     }
 
     private string AppealEmail =>
@@ -81,13 +93,7 @@ public class AuthController : ControllerBase
         if (!result.Succeeded)
             return BadRequest(result.Errors.Select(e => e.Description));
 
-        if (user.IsApproved)
-            return Ok(Respond(user));
-
-        return Ok(new RegisterPendingDto(
-            "Registration received. An administrator will approve your account before you can sign in.",
-            user.Email!,
-            user.Role.ToString()));
+        return await SendCodeResponse(user);
     }
 
     [HttpPost("register/doctor")]
@@ -120,13 +126,72 @@ public class AuthController : ControllerBase
         if (!result.Succeeded)
             return BadRequest(result.Errors.Select(e => e.Description));
 
-        if (user.IsApproved)
-            return Ok(Respond(user));
+        return await SendCodeResponse(user);
+    }
 
-        return Ok(new RegisterPendingDto(
-            "Registration received. An administrator will approve your account before you can sign in.",
-            user.Email!,
-            user.Role.ToString()));
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail(VerifyEmailDto dto)
+    {
+        var user = await _users.FindByEmailAsync(dto.Email.Trim());
+        if (user is null || user.EmailConfirmed)
+            return BadRequest(new { message = "Invalid or expired code." });
+
+        if (user.EmailVerificationAttempts >= MaxCodeAttempts
+            || user.EmailVerificationCodeHash is null
+            || user.EmailVerificationCodeExpiresUtc is null
+            || user.EmailVerificationCodeExpiresUtc < DateTime.UtcNow)
+        {
+            return BadRequest(new { message = "Invalid or expired code. Request a new one." });
+        }
+
+        var code = new string((dto.Code ?? "").Where(char.IsDigit).ToArray());
+        var hash = HashCode(user.Id, code);
+        if (!CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(hash),
+                Encoding.UTF8.GetBytes(user.EmailVerificationCodeHash)))
+        {
+            user.EmailVerificationAttempts++;
+            await _users.UpdateAsync(user);
+            return BadRequest(new { message = "Invalid or expired code." });
+        }
+
+        user.EmailConfirmed = true;
+        user.EmailVerificationCodeHash = null;
+        user.EmailVerificationCodeExpiresUtc = null;
+        user.EmailVerificationAttempts = 0;
+        await _users.UpdateAsync(user);
+
+        if (!user.IsApproved && user.Role != UserRole.Admin)
+        {
+            return Ok(new EmailVerifiedPendingDto(
+                "Email confirmed. An administrator still has to approve your account before you can sign in."));
+        }
+
+        return Ok(Respond(user));
+    }
+
+    [HttpPost("resend-email-code")]
+    public async Task<IActionResult> ResendEmailCode(ResendEmailCodeDto dto)
+    {
+        var user = await _users.FindByEmailAsync(dto.Email.Trim());
+        if (user is null || user.EmailConfirmed)
+            return Ok(new { message = "If this account still needs a code, a new one was sent." });
+
+        if (user.EmailVerificationSentUtc is not null
+            && user.EmailVerificationSentUtc.Value.AddSeconds(ResendCooldownSeconds) > DateTime.UtcNow)
+        {
+            return StatusCode(StatusCodes.Status429TooManyRequests, new
+            {
+                message = "Wait a minute before requesting another code."
+            });
+        }
+
+        var code = await IssueCodeAsync(user);
+        return Ok(new
+        {
+            message = "A new code was sent.",
+            devCode = _env.IsDevelopment() ? code : null
+        });
     }
 
     [HttpPost("login")]
@@ -138,6 +203,15 @@ public class AuthController : ControllerBase
 
         if (user.Role == UserRole.Admin)
             return Ok(Respond(user));
+
+        if (!user.EmailConfirmed)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new LoginBlockedDto(
+                "Confirm your email with the 6-digit code we sent.",
+                "EmailUnconfirmed",
+                null,
+                AppealEmail));
+        }
 
         // Migrate legacy rows that only have IsApproved.
         if (user.VerificationStatus == VerificationStatus.Pending && user.IsApproved)
@@ -167,6 +241,37 @@ public class AuthController : ControllerBase
 
         return Ok(Respond(user));
     }
+
+    private async Task<IActionResult> SendCodeResponse(ApplicationUser user)
+    {
+        var code = await IssueCodeAsync(user);
+        return Ok(new RegisterPendingDto(
+            "We sent a 6-digit code to your email. Enter it to verify the address.",
+            user.Email!,
+            user.Role.ToString(),
+            RequiresEmailCode: true,
+            DevCode: _env.IsDevelopment() ? code : null));
+    }
+
+    private async Task<string> IssueCodeAsync(ApplicationUser user)
+    {
+        var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        user.EmailConfirmed = false;
+        user.EmailVerificationCodeHash = HashCode(user.Id, code);
+        user.EmailVerificationCodeExpiresUtc = DateTime.UtcNow.AddMinutes(CodeLifetimeMinutes);
+        user.EmailVerificationSentUtc = DateTime.UtcNow;
+        user.EmailVerificationAttempts = 0;
+        await _users.UpdateAsync(user);
+
+        await _email.SendAsync(
+            user.Email!,
+            "MedTer verification code",
+            $"Your MedTer verification code is {code}. It expires in {CodeLifetimeMinutes} minutes.");
+        return code;
+    }
+
+    private static string HashCode(string userId, string code) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{userId}:{code}")));
 
     private AuthResponseDto Respond(ApplicationUser user) =>
         new(_tokens.CreateToken(user), user.Id, user.DisplayName, user.Role.ToString(), user.ProfilePhotoUrl);

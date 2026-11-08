@@ -21,6 +21,10 @@ public record RegisterDoctorDto(
 
 public record LoginDto(string Email, string Password);
 
+public record VerifyEmailDto(string Email, string Code);
+
+public record ResendEmailCodeDto(string Email);
+
 public record AuthResponseDto(
     string Token,
     string UserId,
@@ -28,7 +32,15 @@ public record AuthResponseDto(
     string Role,
     string? ProfilePhotoUrl = null);
 
-public record RegisterPendingDto(string Message, string Email, string Role);
+public record RegisterPendingDto(
+    string Message,
+    string Email,
+    string Role,
+    bool RequiresEmailCode = false,
+    string? DevCode = null);
+
+/// <summary>Email code accepted, but an admin still has to approve the account.</summary>
+public record EmailVerifiedPendingDto(string Message, bool PendingApproval = true);
 
 /// <summary>Returned on login when the account cannot sign in yet.</summary>
 public record LoginBlockedDto(

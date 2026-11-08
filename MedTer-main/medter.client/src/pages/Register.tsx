@@ -81,6 +81,9 @@ export default function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [codeStep, setCodeStep] = useState(false);
+  const [code, setCode] = useState("");
+  const [devCode, setDevCode] = useState("");
 
   useEffect(() => {
     const fromQuery = roleFromQuery(searchParams.get("role"));
@@ -140,6 +143,12 @@ export default function Register() {
               profilePhotoUrl: photoUrl || null,
             };
       const { data } = await api.post(url, body);
+      const needsCode = data?.requiresEmailCode ?? data?.RequiresEmailCode;
+      if (needsCode) {
+        setDevCode(data?.devCode ?? data?.DevCode ?? "");
+        setCodeStep(true);
+        return;
+      }
       const token = data?.token ?? data?.Token;
       if (token) {
         const nextRole = data.role ?? data.Role;
@@ -169,6 +178,43 @@ export default function Register() {
       setError(msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const verifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const { data } = await api.post("/auth/verify-email", { email: form.email, code });
+      const token = data?.token ?? data?.Token;
+      if (token) {
+        login({
+          token,
+          userId: data.userId ?? data.UserId,
+          displayName: data.displayName ?? data.DisplayName,
+          role: data.role ?? data.Role,
+          profilePhotoUrl: data.profilePhotoUrl ?? data.ProfilePhotoUrl,
+        });
+        navigate("/?welcome=1", { replace: true });
+        return;
+      }
+      setDone(true);
+    } catch (err: any) {
+      const raw = err?.response?.data;
+      setError(raw?.message || t("კოდი არასწორია ან ვადაგასულია", "The code is invalid or expired"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendCode = async () => {
+    setError("");
+    try {
+      const { data } = await api.post("/auth/resend-email-code", { email: form.email });
+      setDevCode(data?.devCode ?? data?.DevCode ?? "");
+    } catch (err: any) {
+      setError(err?.response?.data?.message || t("კოდის გაგზავნა ვერ მოხერხდა", "Could not send a new code"));
     }
   };
 
@@ -216,6 +262,66 @@ export default function Register() {
       <p className="auth-brand-foot">© MedTer</p>
     </aside>
   );
+
+  if (codeStep && !done) {
+    return (
+      <div className="auth-shell">
+        {brandPanel}
+        <div className="auth-wrap auth-wrap--panel">
+          <div className="auth-side-head">
+            {backButton("auth-page-back--side")}
+            <AuthPrefs />
+          </div>
+          <LinearAdBanner compact />
+          <div className="auth-panel-col">
+            <div className="auth-card">
+              <div className="auth-logo auth-logo--mobile">
+                <img src={logoIcon} alt="" className="logo-mark-img" />
+                <span className="logo-name">Med<span>Ter</span></span>
+              </div>
+              <div className="auth-title">{t("ელფოსტის დადასტურება", "Confirm your email")}</div>
+              <div className="auth-sub" style={{ marginBottom: 16 }}>
+                {t(
+                  "6-ნიშნა კოდი გავგზავნეთ ამ მისამართზე. შეიყვანე ის ანგარიშის გასააქტიურებლად.",
+                  "We sent a 6-digit code to this address. Enter it to verify the account."
+                )}
+              </div>
+              <p style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 14 }}>
+                {t("ელფოსტა", "Email")}: <b style={{ color: "var(--text)" }}>{form.email}</b>
+              </p>
+              {devCode && (
+                <p style={{ fontSize: 13.5, marginBottom: 14 }}>
+                  {t("სატესტო კოდი (ფოსტა არ არის ჩართული)", "Test code (mail is not configured)")}: <b>{devCode}</b>
+                </p>
+              )}
+              {error && <div className="auth-error">{error}</div>}
+              <form onSubmit={verifyCode}>
+                <div className="field">
+                  <label>{t("კოდი", "Code")}</label>
+                  <input
+                    className="control"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    placeholder="000000"
+                    required
+                  />
+                </div>
+                <button className="btn btn-primary btn-block btn-lg" disabled={loading || code.length !== 6}>
+                  {loading ? "..." : t("დადასტურება", "Confirm")}
+                </button>
+              </form>
+              <button type="button" className="btn btn-text btn-sm" style={{ marginTop: 10 }} onClick={resendCode}>
+                {t("კოდის თავიდან გაგზავნა", "Send the code again")}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (done) {
     return (

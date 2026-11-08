@@ -141,6 +141,11 @@ export default function Layout() {
           reason: body?.rejectionReason || undefined,
           appealEmail: body?.appealEmail || "admin@medter.ge",
         });
+      } else if (http === 403 && accountStatus === "EmailUnconfirmed") {
+        setLoginError(t(
+          "ჯერ დაადასტურე ელფოსტა რეგისტრაციისას გამოგზავნილი კოდით",
+          "Confirm your email with the code sent during registration"
+        ));
       } else if (http === 403) {
         setLoginError(t("ანგარიში ადმინის დამტკიცებას ელოდება", "Your account is pending administrator approval"));
       } else {
