@@ -37,7 +37,8 @@ public record RegisterPendingDto(
     string Email,
     string Role,
     bool RequiresEmailCode = false,
-    string? DevCode = null);
+    string? DevCode = null,
+    bool EmailSent = true);
 
 /// <summary>Email code accepted, but an admin still has to approve the account.</summary>
 public record EmailVerifiedPendingDto(string Message, bool PendingApproval = true);

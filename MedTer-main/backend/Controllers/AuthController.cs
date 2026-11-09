@@ -24,6 +24,7 @@ public class AuthController : ControllerBase
     private readonly AppDbContext _db;
     private readonly IEmailSender _email;
     private readonly IHostEnvironment _env;
+    private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         UserManager<ApplicationUser> users,
@@ -31,7 +32,8 @@ public class AuthController : ControllerBase
         IConfiguration config,
         AppDbContext db,
         IEmailSender email,
-        IHostEnvironment env)
+        IHostEnvironment env,
+        ILogger<AuthController> logger)
     {
         _users = users;
         _tokens = tokens;
@@ -39,6 +41,7 @@ public class AuthController : ControllerBase
         _db = db;
         _email = email;
         _env = env;
+        _logger = logger;
     }
 
     private string AppealEmail =>
@@ -186,11 +189,14 @@ public class AuthController : ControllerBase
             });
         }
 
-        var code = await IssueCodeAsync(user);
+        var (code, sent) = await IssueCodeAsync(user);
         return Ok(new
         {
-            message = "A new code was sent.",
-            devCode = _env.IsDevelopment() ? code : null
+            message = sent
+                ? "A new code was sent."
+                : "The email could not be sent. Check the mail settings and try again.",
+            devCode = _env.IsDevelopment() ? code : null,
+            emailSent = sent
         });
     }
 
@@ -244,16 +250,19 @@ public class AuthController : ControllerBase
 
     private async Task<IActionResult> SendCodeResponse(ApplicationUser user)
     {
-        var code = await IssueCodeAsync(user);
+        var (code, sent) = await IssueCodeAsync(user);
         return Ok(new RegisterPendingDto(
-            "We sent a 6-digit code to your email. Enter it to verify the address.",
+            sent
+                ? "We sent a 6-digit code to your email. Enter it to verify the address."
+                : "The account was created, but the verification email could not be sent.",
             user.Email!,
             user.Role.ToString(),
             RequiresEmailCode: true,
-            DevCode: _env.IsDevelopment() ? code : null));
+            DevCode: _env.IsDevelopment() ? code : null,
+            EmailSent: sent));
     }
 
-    private async Task<string> IssueCodeAsync(ApplicationUser user)
+    private async Task<(string Code, bool Sent)> IssueCodeAsync(ApplicationUser user)
     {
         var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
         user.EmailConfirmed = false;
@@ -263,11 +272,19 @@ public class AuthController : ControllerBase
         user.EmailVerificationAttempts = 0;
         await _users.UpdateAsync(user);
 
-        await _email.SendAsync(
-            user.Email!,
-            "MedTer verification code",
-            $"Your MedTer verification code is {code}. It expires in {CodeLifetimeMinutes} minutes.");
-        return code;
+        try
+        {
+            await _email.SendAsync(
+                user.Email!,
+                "MedTer verification code",
+                $"Your MedTer verification code is {code}. It expires in {CodeLifetimeMinutes} minutes.");
+            return (code, true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Could not send verification email to {Email}", user.Email);
+            return (code, false);
+        }
     }
 
     private static string HashCode(string userId, string code) =>

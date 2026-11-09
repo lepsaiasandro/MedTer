@@ -32,13 +32,22 @@ public class SmtpEmailSender : IEmailSender
     public async Task SendAsync(string to, string subject, string body)
     {
         var smtp = _config.GetSection("Email:Smtp");
-        using var client = new SmtpClient(smtp["Host"], int.Parse(smtp["Port"] ?? "587"))
+        var host = smtp["Host"];
+        var username = smtp["Username"];
+        var password = (smtp["Password"] ?? "").Replace(" ", "");
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            throw new InvalidOperationException("Email SMTP is not configured.");
+
+        using var client = new SmtpClient(host, int.Parse(smtp["Port"] ?? "587"))
         {
-            Credentials = new NetworkCredential(smtp["Username"], smtp["Password"]),
-            EnableSsl = true
+            DeliveryMethod = SmtpDeliveryMethod.Network,
+            UseDefaultCredentials = false,
+            EnableSsl = true,
+            Credentials = new NetworkCredential(username, password),
+            Timeout = 20_000
         };
 
-        var message = new MailMessage(smtp["From"] ?? smtp["Username"]!, to, subject, body);
+        using var message = new MailMessage(smtp["From"] ?? username, to, subject, body);
         await client.SendMailAsync(message);
     }
 }
