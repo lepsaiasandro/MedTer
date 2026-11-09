@@ -159,7 +159,21 @@ try
     if (db.Database.IsSqlite())
         db.Database.EnsureCreated();
     else
-        db.Database.Migrate();
+    {
+        try
+        {
+            db.Database.Migrate();
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogError(ex, "Database migration failed. Missing columns will be added in place.");
+        }
+    }
+
+    // EnsureCreated never alters an existing SQLite file. Without this, login
+    // queries columns that are not there and every account returns 500.
+    await SchemaRepair.EnsureApplicationUserColumnsAsync(db, app.Logger);
+
     // Development always seeds demo data. Production: set Seed__Demo=true in Azure App Settings.
     var seedDemo = app.Environment.IsDevelopment()
         || app.Configuration.GetValue("Seed:Demo", false);

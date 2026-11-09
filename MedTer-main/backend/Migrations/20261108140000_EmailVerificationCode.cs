@@ -12,33 +12,19 @@ namespace backend.Migrations
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "EmailVerificationAttempts",
-                table: "AspNetUsers",
-                type: "int",
-                nullable: false,
-                defaultValue: 0);
-
-            migrationBuilder.AddColumn<DateTime>(
-                name: "EmailVerificationCodeExpiresUtc",
-                table: "AspNetUsers",
-                type: "datetime2",
-                nullable: true);
-
-            migrationBuilder.AddColumn<string>(
-                name: "EmailVerificationCodeHash",
-                table: "AspNetUsers",
-                type: "nvarchar(max)",
-                nullable: true);
-
-            migrationBuilder.AddColumn<DateTime>(
-                name: "EmailVerificationSentUtc",
-                table: "AspNetUsers",
-                type: "datetime2",
-                nullable: true);
-
-            // Accounts that already exist were created before email codes.
-            migrationBuilder.Sql("UPDATE AspNetUsers SET EmailConfirmed = 1");
+            // Idempotent: a previous boot may already have added these columns
+            // after a failed migration, and AddColumn would then abort startup.
+            migrationBuilder.Sql("""
+                IF COL_LENGTH('AspNetUsers', 'EmailVerificationAttempts') IS NULL
+                    ALTER TABLE AspNetUsers ADD EmailVerificationAttempts int NOT NULL CONSTRAINT DF_AspNetUsers_EmailVerificationAttempts DEFAULT 0;
+                IF COL_LENGTH('AspNetUsers', 'EmailVerificationCodeExpiresUtc') IS NULL
+                    ALTER TABLE AspNetUsers ADD EmailVerificationCodeExpiresUtc datetime2 NULL;
+                IF COL_LENGTH('AspNetUsers', 'EmailVerificationCodeHash') IS NULL
+                    ALTER TABLE AspNetUsers ADD EmailVerificationCodeHash nvarchar(max) NULL;
+                IF COL_LENGTH('AspNetUsers', 'EmailVerificationSentUtc') IS NULL
+                    ALTER TABLE AspNetUsers ADD EmailVerificationSentUtc datetime2 NULL;
+                UPDATE AspNetUsers SET EmailConfirmed = 1;
+                """);
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
