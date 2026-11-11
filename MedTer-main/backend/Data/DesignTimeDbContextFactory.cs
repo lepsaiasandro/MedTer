@@ -15,9 +15,16 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
             .AddJsonFile("appsettings.json")
             .Build();
 
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseSqlServer(config.GetConnectionString("Default"))
-            .Options;
+        var connection = config.GetConnectionString("Default") ?? "";
+        var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
+        if (connection.Contains("postgres", StringComparison.OrdinalIgnoreCase)
+            || connection.Contains("Ssl Mode=", StringComparison.OrdinalIgnoreCase)
+            || connection.Contains("SSL Mode=", StringComparison.OrdinalIgnoreCase))
+            optionsBuilder.UseNpgsql(connection);
+        else
+            optionsBuilder.UseSqlServer(connection);
+
+        var options = optionsBuilder.Options;
 
         return new AppDbContext(options);
     }

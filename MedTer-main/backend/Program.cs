@@ -51,10 +51,13 @@ if (string.IsNullOrWhiteSpace(sqlConnection))
 }
 var useSqlite = sqlConnection.Contains("Data Source=", StringComparison.OrdinalIgnoreCase)
     || sqlConnection.Contains("DataSource=", StringComparison.OrdinalIgnoreCase);
+var usePostgres = !useSqlite && IsPostgresConnection(sqlConnection);
 builder.Services.AddDbContext<AppDbContext>(opt =>
 {
     if (useSqlite)
         opt.UseSqlite(sqlConnection);
+    else if (usePostgres)
+        opt.UseNpgsql(sqlConnection);
     else
         opt.UseSqlServer(sqlConnection);
 });
@@ -155,8 +158,8 @@ try
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    // SQL Server migrations are not compatible with SQLite — create schema from the model instead.
-    if (db.Database.IsSqlite())
+    // SQL Server migrations are not compatible with SQLite or PostgreSQL — create schema from the model instead.
+    if (db.Database.IsSqlite() || db.Database.IsNpgsql())
         db.Database.EnsureCreated();
     else
     {
@@ -207,3 +210,11 @@ app.MapHub<ChatHub>("/hubs/chat");
 app.MapFallbackToFile("index.html");
 
 app.Run();
+
+static bool IsPostgresConnection(string connection)
+{
+    return connection.Contains("postgres", StringComparison.OrdinalIgnoreCase)
+        || connection.Contains("Ssl Mode=", StringComparison.OrdinalIgnoreCase)
+        || connection.Contains("SSL Mode=", StringComparison.OrdinalIgnoreCase)
+        || connection.Contains("Port=5432", StringComparison.OrdinalIgnoreCase);
+}

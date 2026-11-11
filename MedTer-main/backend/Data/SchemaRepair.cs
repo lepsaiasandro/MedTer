@@ -30,6 +30,7 @@ public static class SchemaRepair
         try
         {
             var sqlite = db.Database.IsSqlite();
+            var postgres = db.Database.IsNpgsql();
             var existing = await ReadColumnsAsync(conn, tableName, sqlite);
             if (existing.Count == 0)
                 return;
@@ -43,7 +44,9 @@ public static class SchemaRepair
 
                 var sql = sqlite
                     ? SqliteAddColumn(tableName, column, prop)
-                    : SqlServerAddColumn(tableName, column, prop);
+                    : postgres
+                        ? PostgresAddColumn(tableName, column, prop)
+                        : SqlServerAddColumn(tableName, column, prop);
 
                 logger.LogWarning("Adding missing column {Table}.{Column}", tableName, column);
                 await using var alter = conn.CreateCommand();
@@ -87,6 +90,15 @@ public static class SchemaRepair
     }
 
     private static string SqliteAddColumn(string table, string column, IProperty prop)
+    {
+        var type = prop.GetColumnType();
+        var nullability = prop.IsNullable
+            ? "NULL"
+            : $"NOT NULL {DefaultClause(prop, sqlite: true)}";
+        return $"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {type} {nullability}";
+    }
+
+    private static string PostgresAddColumn(string table, string column, IProperty prop)
     {
         var type = prop.GetColumnType();
         var nullability = prop.IsNullable
